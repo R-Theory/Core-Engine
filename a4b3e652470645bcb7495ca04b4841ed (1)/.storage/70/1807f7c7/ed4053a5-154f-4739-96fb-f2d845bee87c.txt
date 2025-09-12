@@ -1,0 +1,7 @@
+$ mkdir -p backend/{app/{api/v1,core,models,services,plugins,agents,tests},scripts} frontend/{src/{app,components,lib,hooks,stores,types},public} docs scripts
+$ cp .env.example backend/.env
+
+$ cp .env.example frontend/.env.local
+
+$ chmod +x scripts/test_system.py
+

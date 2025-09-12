@@ -1,0 +1,383 @@
+classDiagram
+    %% Core System Classes
+    class FastAPIApp {
+        +app: FastAPI
+        +lifespan() AsyncContextManager
+        +setup_middleware()
+        +setup_routes()
+        +health_check() dict
+    }
+
+    %% Authentication & User Management
+    class User {
+        +id: UUID
+        +email: str
+        +username: str
+        +password_hash: str
+        +first_name: str
+        +last_name: str
+        +created_at: datetime
+        +is_active: bool
+        +courses: List[Course]
+        +workflows: List[Workflow]
+        +resources: List[Resource]
+        +plugins: List[Plugin]
+    }
+
+    class AuthService {
+        +authenticate_user(email: str, password: str) User
+        +create_access_token(data: dict) str
+        +create_refresh_token(data: dict) str
+        +verify_token(token: str) dict
+        +get_current_user(token: str) User
+        +refresh_access_token(refresh_token: str) str
+    }
+
+    %% Course Management
+    class Course {
+        +id: UUID
+        +user_id: UUID
+        +name: str
+        +code: str
+        +semester: str
+        +instructor: str
+        +description: str
+        +external_id: str
+        +created_at: datetime
+        +topics: List[Topic]
+        +assignments: List[Assignment]
+        +resources: List[Resource]
+    }
+
+    class Topic {
+        +id: UUID
+        +course_id: UUID
+        +parent_topic_id: UUID
+        +name: str
+        +description: str
+        +order_index: int
+        +assignments: List[Assignment]
+        +resources: List[Resource]
+    }
+
+    class Assignment {
+        +id: UUID
+        +course_id: UUID
+        +title: str
+        +description: str
+        +due_date: datetime
+        +status: AssignmentStatus
+        +points_possible: int
+        +external_id: str
+        +ai_analysis: dict
+        +resources: List[Resource]
+        +is_upcoming() bool
+        +is_overdue() bool
+    }
+
+    class CourseService {
+        +get_user_courses(user_id: UUID) List[Course]
+        +create_course(user_id: UUID, course_data: dict) Course
+        +update_course(course_id: UUID, course_data: dict) Course
+        +delete_course(course_id: UUID) bool
+        +get_course_assignments(course_id: UUID) List[Assignment]
+        +sync_external_data(course_id: UUID) dict
+    }
+
+    %% Resource Management
+    class Resource {
+        +id: UUID
+        +user_id: UUID
+        +title: str
+        +type: ResourceType
+        +url: str
+        +file_path: str
+        +content: str
+        +tags: List[str]
+        +metadata: dict
+        +ai_summary: str
+        +created_at: datetime
+        +last_accessed: datetime
+    }
+
+    class ResourceAssociation {
+        +id: UUID
+        +resource_id: UUID
+        +course_id: UUID
+        +topic_id: UUID
+        +assignment_id: UUID
+        +created_at: datetime
+    }
+
+    class ResourceService {
+        +create_resource(user_id: UUID, resource_data: dict) Resource
+        +get_user_resources(user_id: UUID, filters: dict) List[Resource]
+        +search_resources(user_id: UUID, query: str) List[Resource]
+        +tag_resource(resource_id: UUID, tags: List[str]) Resource
+        +associate_resource(resource_id: UUID, associations: dict) bool
+        +generate_ai_summary(resource_id: UUID) str
+    }
+
+    %% Plugin System
+    class PluginManifest {
+        +metadata: dict
+        +spec: dict
+        +name: str
+        +version: str
+        +capabilities: List[PluginCapability]
+        +validate() bool
+    }
+
+    class BasePlugin {
+        <<abstract>>
+        +manifest: PluginManifest
+        +config: dict
+        +session: ClientSession
+        +authenticate(credentials: dict) bool
+        +validate_configuration(config: dict) dict
+        +execute_action(context: PluginExecutionContext) PluginExecutionResult
+        +get_health_status() dict
+        +handle_webhook(payload: dict) dict
+    }
+
+    class CanvasPlugin {
+        +get_courses() List[dict]
+        +get_assignments(course_id: str) List[dict]
+        +get_grades(course_id: str) List[dict]
+        +setup_webhook(endpoint: str) bool
+    }
+
+    class GitHubPlugin {
+        +get_repositories() List[dict]
+        +get_commits(repo_id: str) List[dict]
+        +get_issues(repo_id: str) List[dict]
+        +create_webhook(repo_id: str, endpoint: str) bool
+    }
+
+    class GoogleDrivePlugin {
+        +list_files(folder_id: str) List[dict]
+        +download_file(file_id: str) bytes
+        +upload_file(file_data: bytes, metadata: dict) dict
+        +sync_folder(folder_id: str) dict
+    }
+
+    class PluginRegistry {
+        +loaded_plugins: Dict[str, PluginManifest]
+        +plugin_instances: Dict[str, BasePlugin]
+        +discover_plugins() List[str]
+        +load_plugin(plugin_name: str) PluginManifest
+        +get_plugin_instance(plugin_name: str, config: dict) BasePlugin
+        +execute_plugin_action(plugin_name: str, action: str, params: dict) PluginExecutionResult
+        +validate_manifest(manifest: PluginManifest) bool
+    }
+
+    class PluginSandbox {
+        +plugin_name: str
+        +manifest: PluginManifest
+        +container: Container
+        +start_container() str
+        +execute_action(action: str, params: dict) dict
+        +cleanup() void
+    }
+
+    %% AI Agent Framework
+    class AgentConfig {
+        +name: str
+        +type: AgentType
+        +provider: str
+        +model: str
+        +temperature: float
+        +max_tokens: int
+        +timeout: int
+        +cost_per_request: float
+        +capabilities: List[AgentCapability]
+    }
+
+    class BaseAgent {
+        <<abstract>>
+        +config: AgentConfig
+        +session_id: str
+        +process(request: AgentRequest) AgentResponse
+        +stream_process(request: AgentRequest) AsyncGenerator[str]
+        +get_cost_estimate(prompt: str) float
+        +validate_request(request: AgentRequest) bool
+        +health_check() dict
+    }
+
+    class MetaGPTAgent {
+        +generate_code(prompt: str, context: dict) str
+        +analyze_architecture(code: str) dict
+        +create_documentation(code: str) str
+        +review_code(code: str) dict
+    }
+
+    class ClaudeAgent {
+        +analyze_document(content: str) dict
+        +summarize_text(text: str) str
+        +answer_question(question: str, context: str) str
+        +generate_insights(data: dict) dict
+    }
+
+    class PerplexityAgent {
+        +web_search(query: str) List[dict]
+        +research_topic(topic: str) dict
+        +fact_check(statement: str) dict
+        +get_latest_info(subject: str) dict
+    }
+
+    class AgentOrchestrator {
+        +agents: Dict[str, BaseAgent]
+        +agent_configs: Dict[str, AgentConfig]
+        +register_agent(agent_id: str, agent: BaseAgent) void
+        +get_agent(agent_id: str) BaseAgent
+        +execute_single_agent(agent_id: str, request: AgentRequest) AgentResponse
+        +execute_agent_chain(chain_config: List[dict], context: AgentContext) List[AgentResponse]
+        +execute_parallel_agents(agent_requests: List[dict]) List[AgentResponse]
+        +get_agent_recommendations(task: str, capabilities: List[AgentCapability]) List[str]
+    }
+
+    %% Workflow System
+    class Workflow {
+        +id: UUID
+        +user_id: UUID
+        +name: str
+        +description: str
+        +config: dict
+        +is_active: bool
+        +created_at: datetime
+        +executions: List[WorkflowExecution]
+    }
+
+    class WorkflowExecution {
+        +id: UUID
+        +workflow_id: UUID
+        +status: WorkflowStatus
+        +started_at: datetime
+        +completed_at: datetime
+        +results: dict
+        +error_message: str
+    }
+
+    class WorkflowStep {
+        +name: str
+        +type: WorkflowStepType
+        +config: dict
+        +depends_on: List[str]
+        +condition: str
+        +timeout: int
+        +retry_count: int
+        +max_retries: int
+    }
+
+    class WorkflowDefinition {
+        +name: str
+        +description: str
+        +version: str
+        +steps: List[WorkflowStep]
+        +variables: dict
+        +timeout: int
+    }
+
+    class WorkflowEngine {
+        +plugin_registry: PluginRegistry
+        +agent_orchestrator: AgentOrchestrator
+        +running_executions: Dict[str, WorkflowExecutionContext]
+        +execute_workflow(definition: WorkflowDefinition, user_id: UUID) str
+        +get_execution_status(execution_id: str) dict
+        +cancel_execution(execution_id: str) bool
+        +_execute_single_step(step: WorkflowStep, context: WorkflowExecutionContext) void
+        +_build_dependency_graph(steps: List[WorkflowStep]) dict
+    }
+
+    %% Database and Caching
+    class DatabaseManager {
+        +engine: AsyncEngine
+        +session_factory: AsyncSessionFactory
+        +get_session() AsyncSession
+        +init_db() void
+        +close_connections() void
+    }
+
+    class CacheManager {
+        +redis_client: Redis
+        +get_or_set(key: str, factory_func: Callable, ttl: int) Any
+        +invalidate_pattern(pattern: str) void
+        +invalidate_user_data(user_id: UUID) void
+    }
+
+    %% API Layer
+    class AuthRouter {
+        +login(credentials: UserCredentials) TokenResponse
+        +refresh_token(refresh_token: str) TokenResponse
+        +logout() dict
+        +register(user_data: UserCreate) User
+    }
+
+    class CourseRouter {
+        +get_courses(current_user: User) List[Course]
+        +create_course(course_data: CourseCreate, current_user: User) Course
+        +get_course(course_id: UUID, current_user: User) Course
+        +update_course(course_id: UUID, course_data: CourseUpdate, current_user: User) Course
+        +delete_course(course_id: UUID, current_user: User) dict
+    }
+
+    class ResourceRouter {
+        +get_resources(filters: ResourceFilters, current_user: User) List[Resource]
+        +create_resource(resource_data: ResourceCreate, current_user: User) Resource
+        +search_resources(query: str, current_user: User) List[Resource]
+        +upload_file(file: UploadFile, current_user: User) Resource
+    }
+
+    class WorkflowRouter {
+        +get_workflows(current_user: User) List[Workflow]
+        +create_workflow(workflow_data: WorkflowCreate, current_user: User) Workflow
+        +execute_workflow(workflow_id: UUID, params: dict, current_user: User) dict
+        +get_execution_status(execution_id: str, current_user: User) dict
+    }
+
+    class PluginRouter {
+        +get_plugins(current_user: User) List[Plugin]
+        +install_plugin(manifest_data: dict, current_user: User) Plugin
+        +configure_plugin(plugin_id: UUID, config: dict, current_user: User) Plugin
+        +execute_plugin_action(plugin_id: UUID, action_data: dict, current_user: User) dict
+    }
+
+    class AgentRouter {
+        +get_agents(current_user: User) List[Agent]
+        +process_request(agent_id: str, request_data: dict, current_user: User) AgentResponse
+        +get_agent_recommendations(task_description: str, current_user: User) List[str]
+    }
+
+    %% Relationships
+    User ||--o{ Course : owns
+    User ||--o{ Workflow : creates
+    User ||--o{ Resource : manages
+    Course ||--o{ Topic : contains
+    Course ||--o{ Assignment : has
+    Topic ||--o{ Assignment : includes
+    Resource ||--o{ ResourceAssociation : associated_with
+    Workflow ||--o{ WorkflowExecution : executes
+    WorkflowDefinition ||--o{ WorkflowStep : contains
+
+    BasePlugin <|-- CanvasPlugin : implements
+    BasePlugin <|-- GitHubPlugin : implements
+    BasePlugin <|-- GoogleDrivePlugin : implements
+    BaseAgent <|-- MetaGPTAgent : implements
+    BaseAgent <|-- ClaudeAgent : implements
+    BaseAgent <|-- PerplexityAgent : implements
+
+    PluginRegistry --> BasePlugin : manages
+    AgentOrchestrator --> BaseAgent : orchestrates
+    WorkflowEngine --> PluginRegistry : uses
+    WorkflowEngine --> AgentOrchestrator : uses
+
+    CourseService --> Course : manages
+    ResourceService --> Resource : manages
+    AuthService --> User : authenticates
+
+    AuthRouter --> AuthService : uses
+    CourseRouter --> CourseService : uses
+    ResourceRouter --> ResourceService : uses
+    WorkflowRouter --> WorkflowEngine : uses
+    PluginRouter --> PluginRegistry : uses
+    AgentRouter --> AgentOrchestrator : uses
