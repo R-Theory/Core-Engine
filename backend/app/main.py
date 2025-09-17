@@ -128,6 +128,94 @@ async def health_check():
     }
     return health_status
 
+@app.post("/github-app/list-installations")
+async def list_github_app_installations(credentials: dict):
+    """List all installations for a GitHub App to find installation IDs"""
+    try:
+        from app.integrations.github_integration import (
+            GitHubConfig, GitHubAuthMode, GitHubIntegration
+        )
+        import jwt
+        import time
+        import aiohttp
+
+        # Validate required fields for JWT generation
+        if not credentials.get("app_id") or not credentials.get("private_key"):
+            return {
+                "success": False,
+                "error": "Missing required fields",
+                "message": "Please provide app_id and private_key to list installations"
+            }
+
+        try:
+            app_id = int(credentials["app_id"])
+            private_key = credentials["private_key"].strip()
+
+            # Generate JWT token
+            now = int(time.time())
+            payload = {
+                "iat": now,
+                "exp": now + 600,
+                "iss": app_id
+            }
+            jwt_token = jwt.encode(payload, private_key, algorithm="RS256")
+
+            # List installations
+            headers = {
+                "Authorization": f"Bearer {jwt_token}",
+                "Accept": "application/vnd.github.v3+json",
+                "User-Agent": "CoreEngine-Setup/1.0"
+            }
+
+            async with aiohttp.ClientSession() as session:
+                async with session.get("https://api.github.com/app/installations", headers=headers) as response:
+                    if response.status == 200:
+                        installations = await response.json()
+
+                        result = []
+                        for install in installations:
+                            result.append({
+                                "installation_id": install["id"],
+                                "account": install["account"]["login"],
+                                "account_type": install["account"]["type"],
+                                "repository_selection": install.get("repository_selection", "unknown"),
+                                "app_id": install["app_id"],
+                                "target_type": install["target_type"]
+                            })
+
+                        return {
+                            "success": True,
+                            "message": f"Found {len(result)} installations",
+                            "installations": result
+                        }
+                    else:
+                        error_text = await response.text()
+                        return {
+                            "success": False,
+                            "error": "GitHub API error",
+                            "message": f"Status {response.status}: {error_text}"
+                        }
+
+        except ValueError as e:
+            return {
+                "success": False,
+                "error": "Invalid configuration",
+                "message": f"Configuration error: {str(e)}"
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": "Request failed",
+                "message": str(e)
+            }
+
+    except Exception as e:
+        return {
+            "success": False,
+            "error": "Setup failed",
+            "message": str(e)
+        }
+
 @app.post("/test-github-app")
 async def test_github_app_public(credentials: dict):
     """Public test endpoint for GitHub App credentials"""
