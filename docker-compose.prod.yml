@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  postgres:
+    # Override dev ports for production (no host exposure)
+    ports: []
+
+  redis:
+    # Override dev ports for production (no host exposure)
+    ports: []
+
+  backend:
+    # Run in production mode without bind mounts
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/core_engine
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - ENVIRONMENT=production
+      - UPLOAD_DIR=/app/storage
+    volumes:
+      - backend_storage:/app/storage
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    # Production mode and API URL override
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NODE_ENV=production
+    # Serve built assets from the image (no app volume)
+    volumes: []
+    # If healthcheck tooling is unavailable, keep a noop healthcheck
+    healthcheck:
+      test: ["CMD", "node", "-e", "process.exit(0)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  celery-worker:
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/core_engine
+      - REDIS_URL=redis://redis:6379/1
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - ENVIRONMENT=production
+    volumes:
+      - backend_storage:/app/storage
+    restart: unless-stopped
+
+  celery-beat:
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/core_engine
+      - REDIS_URL=redis://redis:6379/1
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - ENVIRONMENT=production
+    # No code volume in production
+    restart: unless-stopped
+
+volumes:
+  backend_storage:
+
+networks:
+  default:
+    driver: bridge

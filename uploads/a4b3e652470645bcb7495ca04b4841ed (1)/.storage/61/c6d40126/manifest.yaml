@@ -1,0 +1,75 @@
+name: "canvas-integration"
+version: "1.0.0"
+description: "Canvas LMS integration plugin for course and assignment synchronization"
+author: "Core Engine Team"
+license: "MIT"
+
+# Plugin metadata
+category: "lms"
+tags: ["canvas", "lms", "education", "assignments"]
+icon: "canvas-icon.svg"
+
+# Technical requirements
+runtime: "python"
+min_version: "3.9"
+dependencies:
+  - "requests>=2.28.0"
+  - "canvasapi>=3.0.0"
+
+# Configuration schema
+config_schema:
+  canvas_url:
+    type: "string"
+    required: true
+    description: "Canvas instance URL (e.g., https://canvas.unc.edu)"
+    example: "https://canvas.instructure.com"
+  
+  sync_frequency:
+    type: "select"
+    options: ["hourly", "daily", "weekly"]
+    default: "daily"
+    description: "How often to sync data from Canvas"
+
+# OAuth configuration
+oauth:
+  provider: "canvas"
+  scopes: ["url:GET|/api/v1/courses", "url:GET|/api/v1/assignments", "url:GET|/api/v1/users/self"]
+  redirect_uri: "/api/plugins/canvas/oauth/callback"
+
+# Capabilities exported by plugin
+capabilities:
+  - name: "sync_courses"
+    description: "Synchronize courses from Canvas"
+    input_schema:
+      user_id: "string"
+    output_schema:
+      courses: "array"
+      sync_count: "integer"
+      
+  - name: "sync_assignments"
+    description: "Synchronize assignments from Canvas"
+    input_schema:
+      course_id: "string"
+      user_id: "string"
+    output_schema:
+      assignments: "array"
+      sync_count: "integer"
+      
+  - name: "get_grades"
+    description: "Fetch grades for assignments"
+    input_schema:
+      course_id: "string"
+      user_id: "string"
+    output_schema:
+      grades: "array"
+
+# Permissions required
+permissions:
+  - "network:external"
+  - "storage:read"
+  - "storage:write"
+
+# Health check endpoint
+health_check:
+  endpoint: "/health"
+  interval: 300 # seconds
