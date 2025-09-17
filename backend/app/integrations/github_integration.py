@@ -217,8 +217,12 @@ class GitHubIntegration(BaseIntegration[GitHubRepository]):
         """Test GitHub API authentication"""
         try:
             user_data = await self._make_request("/user")
-            self.github_config.username = user_data.get("login")
-            return True
+            if user_data and "login" in user_data:
+                # Store username for display purposes
+                if hasattr(self.github_config, 'username'):
+                    self.github_config.username = user_data.get("login")
+                return True
+            return False
         except Exception as e:
             self.logger.error(f"GitHub authentication failed: {str(e)}")
             return False

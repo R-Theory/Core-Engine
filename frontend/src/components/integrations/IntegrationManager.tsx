@@ -154,12 +154,45 @@ export default function IntegrationManager({ className = '' }: IntegrationManage
       case 'github':
         return [
           {
+            name: 'auth_mode',
+            type: 'select' as const,
+            label: 'Authentication Mode',
+            placeholder: 'Select authentication mode',
+            required: true,
+            description: 'Choose between OAuth (personal access token) or GitHub App',
+            options: ['oauth', 'app']
+          },
+          {
             name: 'access_token',
             type: 'password' as const,
-            label: 'GitHub Token',
+            label: 'GitHub Token (OAuth)',
             placeholder: 'ghp_xxxxxxxxxxxx',
-            required: true,
-            description: 'Personal Access Token from GitHub Settings > Developer settings'
+            required: false,
+            description: 'Personal Access Token (required for OAuth mode)'
+          },
+          {
+            name: 'app_id',
+            type: 'text' as const,
+            label: 'App ID (GitHub App)',
+            placeholder: '123456',
+            required: false,
+            description: 'GitHub App ID (required for App mode)'
+          },
+          {
+            name: 'installation_id',
+            type: 'text' as const,
+            label: 'Installation ID (GitHub App)',
+            placeholder: '12345678',
+            required: false,
+            description: 'GitHub App Installation ID (required for App mode)'
+          },
+          {
+            name: 'private_key',
+            type: 'password' as const,
+            label: 'Private Key (GitHub App)',
+            placeholder: '-----BEGIN RSA PRIVATE KEY-----...',
+            required: false,
+            description: 'GitHub App Private Key (required for App mode)'
           },
           {
             name: 'username',
@@ -190,12 +223,18 @@ export default function IntegrationManager({ className = '' }: IntegrationManage
   const testConnection = async (serviceName: string, config: Record<string, string>) => {
     setTesting(true)
     try {
-      const response = await fetch('/api/v1/settings/integrations/test', {
+      // Determine the provider ID based on service name and auth mode
+      let providerId = serviceName
+      if (serviceName === 'github' && config.auth_mode === 'app') {
+        providerId = 'github_app'
+      }
+
+      const response = await fetch(`/api/v1/credentials/${providerId}/test`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ service_name: serviceName, config })
+        body: JSON.stringify(config)
       })
-      
+
       const result = await response.json()
       return result.success
     } catch (error) {
@@ -447,15 +486,32 @@ function IntegrationConfigModal({
               </label>
               
               <div className="relative">
-                <input
-                  type={field.type === 'password' && !showPasswords[field.name] ? 'password' : 'text'}
-                  value={config[field.name] || ''}
-                  onChange={(e) => setConfig(prev => ({ ...prev, [field.name]: e.target.value }))}
-                  placeholder={field.placeholder}
-                  className="input-modern w-full pr-10"
-                  required={field.required}
-                />
-                
+                {field.type === 'select' ? (
+                  <select
+                    value={config[field.name] || ''}
+                    onChange={(e) => setConfig(prev => ({ ...prev, [field.name]: e.target.value }))}
+                    className="input-modern w-full"
+                    required={field.required}
+                  >
+                    <option value="">{field.placeholder || 'Select an option'}</option>
+                    {field.options?.map((option) => (
+                      <option key={option} value={option}>
+                        {option === 'oauth' ? 'OAuth (Personal Access Token)' :
+                         option === 'app' ? 'GitHub App' : option}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type={field.type === 'password' && !showPasswords[field.name] ? 'password' : 'text'}
+                    value={config[field.name] || ''}
+                    onChange={(e) => setConfig(prev => ({ ...prev, [field.name]: e.target.value }))}
+                    placeholder={field.placeholder}
+                    className="input-modern w-full pr-10"
+                    required={field.required}
+                  />
+                )}
+
                 {field.type === 'password' && (
                   <button
                     type="button"

@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     GITHUB_CLIENT_SECRET: str = ""
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
+
+    # GitHub App Configuration
+    GITHUB_APP_ID: str = ""
+    GITHUB_APP_PRIVATE_KEY: str = ""
+    GITHUB_APP_INSTALLATION_ID: str = ""
     
     # AI Agents
     OPENAI_API_KEY: str = ""

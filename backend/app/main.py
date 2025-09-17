@@ -128,6 +128,89 @@ async def health_check():
     }
     return health_status
 
+@app.post("/test-github-app")
+async def test_github_app_public(credentials: dict):
+    """Public test endpoint for GitHub App credentials"""
+    try:
+        from app.integrations.github_integration import (
+            GitHubConfig, GitHubAuthMode, GitHubIntegration
+        )
+
+        # Validate required fields
+        required_fields = ["app_id", "installation_id", "private_key"]
+        missing_fields = [field for field in required_fields if not credentials.get(field)]
+
+        if missing_fields:
+            return {
+                "success": False,
+                "error": "Missing required fields",
+                "message": f"Please provide: {', '.join(missing_fields)}",
+                "missing_fields": missing_fields
+            }
+
+        # Create GitHub configuration
+        try:
+            config = GitHubConfig(
+                auth_mode=GitHubAuthMode.GITHUB_APP,
+                app_id=int(credentials["app_id"]),
+                installation_id=int(credentials["installation_id"]),
+                private_key=credentials["private_key"].strip()
+            )
+        except ValueError as e:
+            return {
+                "success": False,
+                "error": "Invalid configuration",
+                "message": f"Configuration error: {str(e)}"
+            }
+
+        # Test the GitHub App integration
+        integration = GitHubIntegration("test", config.__dict__)
+
+        try:
+            # Test authentication
+            auth_success = await integration.authenticate()
+
+            if auth_success:
+                # Test repository access
+                repositories = await integration.get_installation_repositories()
+
+                return {
+                    "success": True,
+                    "message": "GitHub App authentication successful",
+                    "details": {
+                        "app_id": config.app_id,
+                        "installation_id": config.installation_id,
+                        "repositories_found": len(repositories),
+                        "username": getattr(integration.github_config, 'username', None)
+                    }
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": "Authentication failed",
+                    "message": "Could not authenticate with GitHub API"
+                }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "error": "GitHub App test failed",
+                "message": str(e),
+                "details": {
+                    "suggestion": "Check your app_id, installation_id, and private_key"
+                }
+            }
+        finally:
+            # Clean up the session
+            await integration.__aexit__(None, None, None)
+
+    except Exception as e:
+        return {
+            "success": False,
+            "error": "Test failed",
+            "message": str(e)
+        }
+
 # Make celery app available for import
 __all__ = ["app", "celery_app"]
 

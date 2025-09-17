@@ -108,7 +108,7 @@ async def get_notion_credentials(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(select(PluginModel).where(PluginModel.name == NOTION_PLUGIN_NAME))
+    result = await db.execute(select(PluginModel).where(PluginModel.name == "notion-storage"))
     plugin = result.scalar_one_or_none()
     if not plugin:
         return NotionCredentialsResponse(configured=False)
@@ -344,17 +344,156 @@ async def test_provider_credentials(
     """Test credentials for a specific provider"""
     if provider_id not in CREDENTIAL_PROVIDERS:
         raise HTTPException(status_code=404, detail=f"Provider '{provider_id}' not supported")
-    
+
     provider_config = CREDENTIAL_PROVIDERS[provider_id]
-    
+
     if not provider_config.get("test_endpoint", False):
         raise HTTPException(
-            status_code=501, 
+            status_code=501,
             detail=f"Connection testing not implemented for {provider_id}"
         )
-    
-    # For now, return a mock success response
-    # In production, this would make actual API calls to test the credentials
+
+    # Handle GitHub App specifically
+    if provider_id == "github_app":
+        try:
+            from app.integrations.github_integration import (
+                GitHubConfig, GitHubAuthMode, GitHubIntegration
+            )
+
+            # Validate required fields
+            required_fields = ["app_id", "installation_id", "private_key"]
+            missing_fields = [field for field in required_fields if not credentials.get(field)]
+
+            if missing_fields:
+                return {
+                    "success": False,
+                    "error": "Missing required fields",
+                    "message": f"Please provide: {', '.join(missing_fields)}",
+                    "missing_fields": missing_fields
+                }
+
+            # Create GitHub configuration
+            try:
+                config = GitHubConfig(
+                    auth_mode=GitHubAuthMode.GITHUB_APP,
+                    app_id=int(credentials["app_id"]),
+                    installation_id=int(credentials["installation_id"]),
+                    private_key=credentials["private_key"].strip()
+                )
+            except ValueError as e:
+                return {
+                    "success": False,
+                    "error": "Invalid configuration",
+                    "message": f"Configuration error: {str(e)}"
+                }
+
+            # Test the GitHub App integration
+            integration = GitHubIntegration("test", config.__dict__)
+
+            try:
+                # Test authentication
+                auth_success = await integration.authenticate()
+
+                if auth_success:
+                    # Test repository access
+                    repositories = await integration.get_installation_repositories()
+
+                    return {
+                        "success": True,
+                        "message": "GitHub App authentication successful",
+                        "details": {
+                            "app_id": config.app_id,
+                            "installation_id": config.installation_id,
+                            "repositories_found": len(repositories),
+                            "username": integration.github_config.username
+                        }
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "error": "Authentication failed",
+                        "message": "Could not authenticate with GitHub API"
+                    }
+
+            except Exception as e:
+                return {
+                    "success": False,
+                    "error": "GitHub App test failed",
+                    "message": str(e),
+                    "details": {
+                        "suggestion": "Check your app_id, installation_id, and private_key"
+                    }
+                }
+            finally:
+                # Clean up the session
+                await integration.__aexit__(None, None, None)
+
+        except Exception as e:
+            return {
+                "success": False,
+                "error": "Test failed",
+                "message": str(e)
+            }
+
+    # Handle GitHub OAuth
+    elif provider_id == "github":
+        try:
+            from app.integrations.github_integration import (
+                GitHubConfig, GitHubAuthMode, GitHubIntegration
+            )
+
+            if not credentials.get("access_token"):
+                return {
+                    "success": False,
+                    "error": "Missing access token",
+                    "message": "Please provide a GitHub access token"
+                }
+
+            config = GitHubConfig(
+                auth_mode=GitHubAuthMode.OAUTH,
+                access_token=credentials["access_token"]
+            )
+
+            integration = GitHubIntegration("test", config.__dict__)
+
+            try:
+                auth_success = await integration.authenticate()
+
+                if auth_success:
+                    repositories = await integration.get_repositories()
+
+                    return {
+                        "success": True,
+                        "message": "GitHub OAuth authentication successful",
+                        "details": {
+                            "username": integration.github_config.username,
+                            "repositories_found": len(repositories)
+                        }
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "error": "Authentication failed",
+                        "message": "Invalid GitHub access token"
+                    }
+
+            except Exception as e:
+                return {
+                    "success": False,
+                    "error": "GitHub test failed",
+                    "message": str(e)
+                }
+            finally:
+                await integration.__aexit__(None, None, None)
+
+        except Exception as e:
+            return {
+                "success": False,
+                "error": "Test failed",
+                "message": str(e)
+            }
+
+    # For other providers, return mock success for now
     return {
         "success": True,
         "message": f"Connection test for {provider_id} successful (mock)",
@@ -369,7 +508,7 @@ async def get_available_providers():
         "total": len(CREDENTIAL_PROVIDERS)
     }
 
-@router.post("/test-github-app")
+@router.post("/credentials/test-github-app")
 async def test_github_app_no_auth(
     credentials: Dict[str, Any]
 ):
