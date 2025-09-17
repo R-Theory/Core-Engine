@@ -6,21 +6,43 @@ Supports knowledge graph connections between code and academic work
 
 import aiohttp
 import asyncio
-from typing import Dict, List, Any, Optional
+import jwt
+import time
+from typing import Dict, List, Any, Optional, Union
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
+from enum import Enum
 
 from app.core.integration_engine import (
     BaseIntegration, IntegrationType, IntegrationCapability, 
     SyncResult, SyncStatus, IntegrationMetadata, register_integration
 )
 
+class GitHubAuthMode(str, Enum):
+    """GitHub authentication modes"""
+    OAUTH = "oauth"        # Personal access token / OAuth
+    GITHUB_APP = "app"     # GitHub App installation
+
 class GitHubConfig(BaseModel):
-    """GitHub API configuration"""
-    access_token: str
+    """GitHub API configuration supporting both OAuth and GitHub App modes"""
+    auth_mode: GitHubAuthMode = GitHubAuthMode.OAUTH
     api_url: str = "https://api.github.com"
     username: Optional[str] = None
+    
+    # OAuth mode fields
+    access_token: Optional[str] = None
+    
+    # GitHub App mode fields
+    app_id: Optional[int] = None
+    private_key: Optional[str] = None
+    installation_id: Optional[int] = None
+    
+    def is_github_app_mode(self) -> bool:
+        return self.auth_mode == GitHubAuthMode.GITHUB_APP
+    
+    def is_oauth_mode(self) -> bool:
+        return self.auth_mode == GitHubAuthMode.OAUTH
 
 class GitHubRepository(BaseModel):
     """GitHub repository data"""
@@ -99,14 +121,59 @@ class GitHubIntegration(BaseIntegration[GitHubRepository]):
             self.github_config = None
         self.session: Optional[aiohttp.ClientSession] = None
     
+    def _generate_jwt_token(self) -> str:
+        """Generate JWT token for GitHub App authentication"""
+        if not self.github_config.is_github_app_mode():
+            raise ValueError("JWT token generation only available in GitHub App mode")
+        
+        if not self.github_config.app_id or not self.github_config.private_key:
+            raise ValueError("Missing app_id or private_key for GitHub App authentication")
+        
+        now = int(time.time())
+        payload = {
+            "iat": now,          # Issued at time
+            "exp": now + 600,    # Expires after 10 minutes (GitHub's max)
+            "iss": self.github_config.app_id  # Issuer (GitHub App ID)
+        }
+        
+        return jwt.encode(payload, self.github_config.private_key, algorithm="RS256")
+    
+    async def _get_installation_token(self) -> str:
+        """Get installation access token for GitHub App"""
+        if not self.github_config.is_github_app_mode():
+            raise ValueError("Installation token only available in GitHub App mode")
+        
+        jwt_token = self._generate_jwt_token()
+        
+        headers = {
+            "Authorization": f"Bearer {jwt_token}",
+            "Accept": "application/vnd.github.v3+json",
+            "User-Agent": "CoreEngine-Integration/1.0"
+        }
+        
+        url = f"{self.github_config.api_url}/app/installations/{self.github_config.installation_id}/access_tokens"
+        
+        async with aiohttp.ClientSession(headers=headers) as session:
+            async with session.post(url) as response:
+                response.raise_for_status()
+                data = await response.json()
+                return data["token"]
+    
     async def _get_session(self) -> aiohttp.ClientSession:
-        """Get or create HTTP session"""
+        """Get or create HTTP session with appropriate authentication"""
         if self.session is None or self.session.closed:
             headers = {
-                "Authorization": f"token {self.github_config.access_token}",
                 "Accept": "application/vnd.github.v3+json",
                 "User-Agent": "CoreEngine-Integration/1.0"
             }
+            
+            if self.github_config.is_oauth_mode():
+                headers["Authorization"] = f"token {self.github_config.access_token}"
+            elif self.github_config.is_github_app_mode():
+                # Get fresh installation token
+                installation_token = await self._get_installation_token()
+                headers["Authorization"] = f"token {installation_token}"
+            
             self.session = aiohttp.ClientSession(headers=headers)
         return self.session
     
@@ -160,10 +227,61 @@ class GitHubIntegration(BaseIntegration[GitHubRepository]):
         """Test GitHub connection"""
         return await self.authenticate()
     
-    async def get_repositories(self, include_private: bool = True) -> List[GitHubRepository]:
-        """Get all repositories for the authenticated user"""
+    async def get_installation_repositories(self) -> List[GitHubRepository]:
+        """Get repositories accessible through GitHub App installation"""
+        if not self.github_config.is_github_app_mode():
+            raise ValueError("Installation repositories only available in GitHub App mode")
+        
         try:
-            # Get user's repositories
+            repos_data = await self._get_paginated_data(
+                f"/installation/repositories"
+            )
+            
+            repositories = []
+            for repo_data in repos_data.get("repositories", []):
+                try:
+                    repository = self._parse_repository_data(repo_data)
+                    repositories.append(repository)
+                except Exception as e:
+                    self.logger.warning(f"Failed to parse installation repository {repo_data.get('id', 'unknown')}: {str(e)}")
+            
+            return repositories
+        except Exception as e:
+            self.logger.error(f"Failed to fetch installation repositories: {str(e)}")
+            return []
+    
+    def _parse_repository_data(self, repo_data: Dict[str, Any]) -> GitHubRepository:
+        """Parse repository data from GitHub API response"""
+        created_at = datetime.fromisoformat(repo_data["created_at"].replace('Z', '+00:00'))
+        updated_at = datetime.fromisoformat(repo_data["updated_at"].replace('Z', '+00:00'))
+        pushed_at = None
+        if repo_data.get("pushed_at"):
+            pushed_at = datetime.fromisoformat(repo_data["pushed_at"].replace('Z', '+00:00'))
+        
+        return GitHubRepository(
+            id=repo_data["id"],
+            name=repo_data["name"],
+            full_name=repo_data["full_name"],
+            description=repo_data.get("description"),
+            private=repo_data["private"],
+            html_url=repo_data["html_url"],
+            clone_url=repo_data["clone_url"],
+            language=repo_data.get("language"),
+            topics=repo_data.get("topics", []),
+            created_at=created_at,
+            updated_at=updated_at,
+            pushed_at=pushed_at,
+            stargazers_count=repo_data.get("stargazers_count", 0),
+            forks_count=repo_data.get("forks_count", 0)
+        )
+
+    async def get_repositories(self, include_private: bool = True) -> List[GitHubRepository]:
+        """Get all repositories (OAuth mode) or installation repositories (GitHub App mode)"""
+        try:
+            if self.github_config.is_github_app_mode():
+                return await self.get_installation_repositories()
+            
+            # OAuth mode: Get user's repositories
             repos_data = await self._get_paginated_data(
                 "/user/repos",
                 {
@@ -176,29 +294,7 @@ class GitHubIntegration(BaseIntegration[GitHubRepository]):
             repositories = []
             for repo_data in repos_data:
                 try:
-                    # Parse dates
-                    created_at = datetime.fromisoformat(repo_data["created_at"].replace('Z', '+00:00'))
-                    updated_at = datetime.fromisoformat(repo_data["updated_at"].replace('Z', '+00:00'))
-                    pushed_at = None
-                    if repo_data.get("pushed_at"):
-                        pushed_at = datetime.fromisoformat(repo_data["pushed_at"].replace('Z', '+00:00'))
-                    
-                    repository = GitHubRepository(
-                        id=repo_data["id"],
-                        name=repo_data["name"],
-                        full_name=repo_data["full_name"],
-                        description=repo_data.get("description"),
-                        private=repo_data["private"],
-                        html_url=repo_data["html_url"],
-                        clone_url=repo_data["clone_url"],
-                        language=repo_data.get("language"),
-                        topics=repo_data.get("topics", []),
-                        created_at=created_at,
-                        updated_at=updated_at,
-                        pushed_at=pushed_at,
-                        stargazers_count=repo_data.get("stargazers_count", 0),
-                        forks_count=repo_data.get("forks_count", 0)
-                    )
+                    repository = self._parse_repository_data(repo_data)
                     repositories.append(repository)
                 except Exception as e:
                     self.logger.warning(f"Failed to parse repository {repo_data.get('id', 'unknown')}: {str(e)}")

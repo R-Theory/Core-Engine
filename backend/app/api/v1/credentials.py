@@ -39,10 +39,19 @@ CREDENTIAL_PROVIDERS = {
     },
     "github": {
         "name": "GitHub",
-        "description": "Code repository and version control",
+        "description": "Code repository and version control (OAuth mode)",
         "plugin_name": "github-provider",
         "fields": ["access_token"],
-        "test_endpoint": False
+        "test_endpoint": True,
+        "auth_mode": "oauth"
+    },
+    "github_app": {
+        "name": "GitHub App",
+        "description": "GitHub App with installation-based permissions",
+        "plugin_name": "github-provider", 
+        "fields": ["app_id", "private_key", "installation_id"],
+        "test_endpoint": True,
+        "auth_mode": "app"
     },
     "canvas": {
         "name": "Canvas LMS", 

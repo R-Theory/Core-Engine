@@ -631,12 +631,24 @@ function CredentialsSection() {
     },
     {
       id: 'github',
-      name: 'GitHub',
-      description: 'Code repository and version control',
+      name: 'GitHub (OAuth)',
+      description: 'Personal GitHub access with OAuth token',
       icon: '🐙',
       category: 'development',
       fields: [
         { name: 'access_token', label: 'Personal Access Token', type: 'password', placeholder: 'ghp_...' }
+      ]
+    },
+    {
+      id: 'github_app',
+      name: 'GitHub App',
+      description: 'GitHub App with installation-based permissions',
+      icon: '🔧',
+      category: 'development',
+      fields: [
+        { name: 'app_id', label: 'App ID', type: 'text', placeholder: '123456' },
+        { name: 'private_key', label: 'Private Key', type: 'textarea', placeholder: '-----BEGIN RSA PRIVATE KEY-----\n...' },
+        { name: 'installation_id', label: 'Installation ID', type: 'text', placeholder: '12345678' }
       ]
     },
     {
@@ -898,13 +910,23 @@ function ProviderConfigForm({ provider, onBack, onSave }: { provider: any, onBac
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
                 {field.label}
               </label>
-              <input
-                type={field.type}
-                value={credentials[field.name] || ''}
-                onChange={(e) => setCredentials(prev => ({ ...prev, [field.name]: e.target.value }))}
-                placeholder={field.placeholder}
-                className="input-modern w-full"
-              />
+              {field.type === 'textarea' ? (
+                <textarea
+                  value={credentials[field.name] || ''}
+                  onChange={(e) => setCredentials(prev => ({ ...prev, [field.name]: e.target.value }))}
+                  placeholder={field.placeholder}
+                  rows={8}
+                  className="input-modern w-full font-mono text-sm"
+                />
+              ) : (
+                <input
+                  type={field.type}
+                  value={credentials[field.name] || ''}
+                  onChange={(e) => setCredentials(prev => ({ ...prev, [field.name]: e.target.value }))}
+                  placeholder={field.placeholder}
+                  className="input-modern w-full"
+                />
+              )}
             </div>
           ))}
         </div>
