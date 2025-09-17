@@ -32,15 +32,15 @@ class UserProfile(Base):
     
     # Relationships
     user = relationship("User", back_populates="profile")
-    context_documents = relationship("UserContextDocument", back_populates="profile", cascade="all, delete-orphan")
+    context_documents = relationship("UserProfileDocument", back_populates="profile", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<UserProfile(user_id={self.user_id}, university={self.university})>"
 
 
-class UserContextDocument(Base):
+class UserProfileDocument(Base):
     """Documents uploaded by users to provide AI context"""
-    __tablename__ = "user_context_documents"
+    __tablename__ = "user_profile_documents"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     profile_id = Column(UUID(as_uuid=True), ForeignKey("user_profiles.id"), nullable=False)
@@ -65,7 +65,7 @@ class UserContextDocument(Base):
     profile = relationship("UserProfile", back_populates="context_documents")
     
     def __repr__(self):
-        return f"<UserContextDocument(filename={self.filename}, processed={self.is_processed})>"
+        return f"<UserProfileDocument(filename={self.filename}, processed={self.is_processed})>"
 
 
 class UserIntegration(Base):

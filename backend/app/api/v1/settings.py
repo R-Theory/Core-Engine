@@ -6,7 +6,7 @@ import uuid
 
 from app.core.database import get_db
 from app.core.security import get_current_user
-from app.models import User, UserProfile, UserIntegration, UserCredential, UserPreference, UserContextDocument
+from app.models import User, UserProfile, UserIntegration, UserCredential, UserPreference, UserProfileDocument
 from app.integrations import integration_engine
 
 router = APIRouter()
@@ -253,7 +253,7 @@ async def get_context_documents(
     if not profile:
         return []
     
-    documents = db.query(UserContextDocument).filter(UserContextDocument.profile_id == profile.id).all()
+    documents = db.query(UserProfileDocument).filter(UserProfileDocument.profile_id == profile.id).all()
     return documents
 
 @router.post("/context-documents/upload")
@@ -280,7 +280,7 @@ async def upload_context_document(
     file_path = f"/app/storage/context_documents/{filename}"
     
     # Save file metadata
-    document = UserContextDocument(
+    document = UserProfileDocument(
         profile_id=profile.id,
         filename=filename,
         original_filename=file.filename,
@@ -308,9 +308,9 @@ async def delete_context_document(
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
     
-    document = db.query(UserContextDocument).filter(
-        UserContextDocument.id == document_id,
-        UserContextDocument.profile_id == profile.id
+    document = db.query(UserProfileDocument).filter(
+        UserProfileDocument.id == document_id,
+        UserProfileDocument.profile_id == profile.id
     ).first()
     
     if not document:

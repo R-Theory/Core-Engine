@@ -77,14 +77,14 @@ class NotionStoragePlugin(StoragePlugin):
         )
 
     async def process(self, data: Any, **kwargs) -> PluginResult:
-        \"\"\"Main processing method required by base Plugin class\"\"\"
+        """Main processing method required by base Plugin class"""
         # For storage plugins, this method can delegate to store
         if isinstance(data, dict) and 'content' in data and 'metadata' in data:
             return await self.store(data['content'], data['metadata'])
         else:
             return PluginResult(
                 success=False,
-                error_message=\"NotionStorage expects data with 'content' and 'metadata' keys\"
+                error_message="NotionStorage expects data with 'content' and 'metadata' keys"
             )
 
     async def initialize(self) -> bool:

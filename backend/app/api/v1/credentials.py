@@ -369,3 +369,82 @@ async def get_available_providers():
         "total": len(CREDENTIAL_PROVIDERS)
     }
 
+@router.post("/test-github-app")
+async def test_github_app_no_auth(
+    credentials: Dict[str, Any]
+):
+    """Test GitHub App credentials without authentication - for development only"""
+    try:
+        from app.integrations.github_integration import (
+            GitHubConfig, GitHubAuthMode, GitHubIntegration
+        )
+        
+        # Validate required fields
+        required_fields = ["app_id", "installation_id", "private_key"]
+        missing_fields = [field for field in required_fields if not credentials.get(field)]
+        
+        if missing_fields:
+            return {
+                "success": False,
+                "error": "Missing required fields",
+                "message": f"Please provide: {', '.join(missing_fields)}",
+                "missing_fields": missing_fields
+            }
+        
+        # Create GitHub configuration
+        try:
+            config = GitHubConfig(
+                auth_mode=GitHubAuthMode.GITHUB_APP,
+                app_id=int(credentials["app_id"]),
+                installation_id=int(credentials["installation_id"]),
+                private_key=credentials["private_key"].strip()
+            )
+        except ValueError as e:
+            return {
+                "success": False,
+                "error": "Invalid configuration",
+                "message": f"Configuration error: {str(e)}"
+            }
+        
+        # Test the GitHub App integration
+        integration = GitHubIntegration("test", config.__dict__)
+        
+        try:
+            # Test JWT generation
+            jwt_token = integration._generate_jwt_token()
+            
+            # Test installation token retrieval
+            installation_token = await integration._get_installation_token()
+            
+            # Test repository access
+            repositories = await integration.get_installation_repositories()
+            
+            return {
+                "success": True,
+                "message": "GitHub App authentication successful",
+                "details": {
+                    "app_id": config.app_id,
+                    "installation_id": config.installation_id,
+                    "repositories_found": len(repositories),
+                    "jwt_generated": bool(jwt_token),
+                    "installation_token_obtained": bool(installation_token)
+                }
+            }
+            
+        except Exception as e:
+            return {
+                "success": False,
+                "error": "GitHub App test failed",
+                "message": str(e),
+                "details": {
+                    "suggestion": "Check your app_id, installation_id, and private_key"
+                }
+            }
+            
+    except Exception as e:
+        return {
+            "success": False,
+            "error": "Test failed",
+            "message": str(e)
+        }
+

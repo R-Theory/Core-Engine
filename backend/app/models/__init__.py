@@ -6,7 +6,7 @@ from .resource import Resource
 from .plugin import Plugin, UserPluginConfig
 from .workflow import Workflow, WorkflowExecution
 from .agent import AIAgent, AgentInteraction
-from .user_profile import UserProfile, UserContextDocument, UserIntegration, UserCredential, UserPreference
+from .user_profile import UserProfile, UserProfileDocument, UserIntegration, UserCredential, UserPreference
 
 __all__ = [
     "User",
@@ -21,7 +21,7 @@ __all__ = [
     "AIAgent",
     "AgentInteraction",
     "UserProfile",
-    "UserContextDocument",
+    "UserProfileDocument",
     "UserIntegration", 
     "UserCredential",
     "UserPreference"
