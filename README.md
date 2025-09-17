@@ -1,10 +1,29 @@
 # Core Engine MVP
 
-AI-Powered Learning & Project Management Platform for University Computer Science Students
+**The Extensible AI-Powered Learning Operating System**
 
-## Overview
+*Built on the philosophy of modularity, extensibility, and intelligent automation*
 
-Core Engine is a modular, extensible platform that serves as a personal study/project operating system. It integrates with educational tools (Canvas, GitHub, Google Drive) and leverages AI agents to automate workflows and enhance learning outcomes.
+## Vision & Philosophy
+
+Core Engine represents a paradigm shift in educational technology - a **plugin-first, AI-native platform** that grows with its users. Our core beliefs:
+
+**🔌 Modularity by Design**: Every feature is a plugin. Every integration is extensible. No vendor lock-in, ever.
+
+**🧠 Intelligence at the Core**: AI isn't bolted on - it's fundamental. Context-aware, personalized, and continuously learning.
+
+**🛠️ Extensibility First**: Built for hackers, by hackers. If you can dream it, you can plugin it.
+
+**🎯 User-Centric**: Technology should adapt to users, not the other way around. Personalized experiences that evolve.
+
+## What Makes Core Engine Different
+
+Unlike monolithic LMS platforms, Core Engine is:
+- **Plugin-Native**: Everything is a plugin - integrations, AI providers, even core features
+- **Context-Aware**: Learns your patterns, preferences, and goals to provide intelligent assistance
+- **Infinitely Extensible**: Write custom plugins for any service, any workflow, any idea
+- **AI-First**: Multiple AI providers working together, each optimized for different tasks
+- **Student-Owned**: Your data, your plugins, your customizations - complete control
 
 ## Features
 
@@ -13,17 +32,32 @@ Core Engine is a modular, extensible platform that serves as a personal study/pr
 - **Canvas Integration**: Automatic synchronization of courses, assignments, and grades
 - **Progress Tracking**: Visual progress indicators and completion analytics
 
-### 🤖 AI Agent Framework
-- **MetaGPT Integration**: Multi-agent workflows for code generation and architecture design
-- **Claude Analysis**: Document analysis, summarization, and question answering
-- **Perplexity Research**: Web search and information gathering capabilities
-- **Agent Orchestration**: Chain multiple AI agents for complex workflows
+### 🧠 AI Context & Personalization System
+- **Contextual Memory**: Learns your preferences, goals, and working patterns over time
+- **Multi-Provider Intelligence**: OpenAI GPT-4, Anthropic Claude, and more working in harmony
+- **Personalized Prompts**: AI responses tailored to your learning style and current projects
+- **Conversation History**: Maintains context across sessions for deeper understanding
+- **Privacy-First**: All personal data encrypted and stored locally - your context stays yours
 
-### 🔌 Plugin System
-- **Modular Architecture**: Dynamic plugin loading with YAML manifests
-- **Sandboxed Execution**: Secure plugin execution with Docker containers
-- **OAuth Integration**: Seamless authentication with external services
-- **Canvas, GitHub, Google Drive**: Built-in integrations for common student tools
+### 🤖 Extensible AI Framework  
+- **Provider Agnostic**: Switch between AI providers seamlessly based on task requirements
+- **Capability Mapping**: Route different tasks to the AI best suited for the job
+- **Mock Responses**: Development-friendly testing without burning API credits
+- **Usage Analytics**: Track AI usage patterns and optimize costs
+
+### 🔌 Plugin-First Architecture
+- **Everything is a Plugin**: Core features, integrations, even AI providers are plugins
+- **Hot-Swappable**: Enable/disable features without restarts
+- **Manifest-Driven**: Simple YAML configuration for complex integrations
+- **Secure by Default**: Sandboxed execution with granular permissions
+- **Community Extensible**: Plugin marketplace for sharing custom integrations
+
+### 🔐 Modular Credential Management
+- **Provider-Based System**: Each service gets its own secure credential management
+- **Encrypted Storage**: AES-256 encryption for all sensitive data
+- **Per-User Isolation**: Credentials are isolated per user with zero cross-contamination
+- **Extensible Providers**: Add new services with simple configuration objects
+- **Connection Testing**: Validate credentials before saving
 
 ### 📚 Resource Management
 - **Central Vault**: Unified storage for files, links, notes, and code repositories
@@ -42,6 +76,33 @@ Core Engine is a modular, extensible platform that serves as a personal study/pr
 - **Real-Time Updates**: Live data synchronization and notifications
 - **Dark Mode**: Support for light and dark themes
 - **Accessibility**: WCAG 2.1 AA compliant interface
+- **Component-Driven**: Reusable UI components that grow with the platform
+
+## Core Engine Philosophy: The Plugin Principle
+
+**"If it can be a plugin, it should be a plugin"**
+
+This isn't just a technical decision - it's our fundamental philosophy. Core Engine treats everything as composable, swappable modules:
+
+### Why Plugin-Everything?
+
+1. **Zero Vendor Lock-in**: Don't like our Canvas integration? Write your own. Prefer a different AI provider? Swap it out.
+
+2. **Infinite Extensibility**: Need integration with your university's custom system? Create a plugin. Want to automate your specific workflow? Plugin it.
+
+3. **Community Innovation**: The best features come from users who know their own needs. Our plugin system makes innovation accessible to everyone.
+
+4. **Future-Proof Architecture**: New services, APIs, and tools emerge constantly. Plugins let us adapt instantly without core changes.
+
+5. **Granular Control**: Enable only what you need. Your Core Engine instance is uniquely yours.
+
+### The Technical Implementation
+
+- **Dynamic Loading**: Plugins are discovered and loaded at runtime
+- **Isolation**: Each plugin runs in its own secure context
+- **API-First**: Consistent interfaces regardless of plugin complexity  
+- **Declarative Configuration**: YAML manifests describe capabilities and requirements
+- **Dependency Management**: Automatic resolution of plugin dependencies
 
 ## Technology Stack
 
