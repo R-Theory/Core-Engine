@@ -16,8 +16,15 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     
-    # CORS
-    ALLOWED_HOSTS: List[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    # CORS - Allow multiple host patterns for development
+    ALLOWED_HOSTS: List[str] = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://192.168.1.86:3000",  # Your network IP
+        "http://192.168.*:3000",     # Any 192.168.x.x IP
+        "http://10.*:3000",          # Any 10.x.x.x IP
+        "http://172.*:3000"          # Any 172.x.x.x IP
+    ]
     
     # Environment
     ENVIRONMENT: str = "development"
