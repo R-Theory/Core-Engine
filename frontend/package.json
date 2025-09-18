@@ -20,7 +20,7 @@
     "@types/node": "^20.9.0",
     "@types/react": "^18.2.38",
     "@types/react-dom": "^18.2.17",
-    "tailwindcss": "^3.3.6",
+    "tailwindcss": "^4.1.13",
     "autoprefixer": "^10.4.16",
     "postcss": "^8.4.31",
     "tailwindcss-animate": "^1.0.7",
