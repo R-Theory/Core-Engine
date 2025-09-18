@@ -127,4 +127,23 @@ bin/
 ###############################
 uploads/
 backend/celerybeat-schedule
+
+###############################
+# AI Agent Artifacts (MetaGPT, Claude, etc.)
+###############################
+.storage/
+.storage.backup/
 .MGXTools/
+.MGXEnv.json
+.timeline.json
+**/task_*.json
+**/agent_*.json
+**/*-task-*.json
+**/*-agent-*.json
+
+###############################
+# Development Artifacts
+###############################
+*.audit.txt
+*_audit.txt
+storage_*.txt
