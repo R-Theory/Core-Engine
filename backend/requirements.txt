@@ -28,7 +28,7 @@ aiofiles==23.2.1
 redis==5.0.1
 
 # Background tasks
-celery==5.3.4
+celery==5.5.3
 
 # HTTP clients
 requests==2.31.0
