@@ -1,0 +1,288 @@
+name: Security Scanning
+
+on:
+  schedule:
+    # Run security scans daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # Advanced security scanning with multiple tools
+  security-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    # Python Security Scanning
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install Python security tools
+      run: |
+        pip install safety bandit semgrep
+
+    - name: Python dependency vulnerability check with Safety
+      working-directory: ./backend
+      run: |
+        safety check --json --output safety-report.json
+        safety check  # Also run normally to see output
+      continue-on-error: true
+
+    - name: Python security linting with Bandit
+      working-directory: ./backend
+      run: |
+        bandit -r app/ -f json -o bandit-report.json
+        bandit -r app/  # Also run normally to see output
+      continue-on-error: true
+
+    - name: Python code scanning with Semgrep
+      run: |
+        semgrep --config=auto --json --output=semgrep-report.json .
+        semgrep --config=auto .  # Also run normally to see output
+      continue-on-error: true
+
+    # Node.js Security Scanning
+    - name: Set up Node.js 18
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: Install Node.js dependencies
+      working-directory: ./frontend
+      run: npm ci
+
+    - name: Node.js dependency vulnerability check
+      working-directory: ./frontend
+      run: |
+        npm audit --audit-level=moderate --json > npm-audit-report.json || true
+        npm audit --audit-level=moderate
+      continue-on-error: true
+
+    # Container Security Scanning
+    - name: Build Docker images for scanning
+      run: |
+        docker build -t core-engine-backend:latest -f backend/Dockerfile backend/
+        docker build -t core-engine-frontend:latest -f frontend/Dockerfile.dev frontend/
+
+    - name: Run Trivy vulnerability scanner on Backend image
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'core-engine-backend:latest'
+        format: 'sarif'
+        output: 'trivy-backend.sarif'
+
+    - name: Run Trivy vulnerability scanner on Frontend image
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'core-engine-frontend:latest'
+        format: 'sarif'
+        output: 'trivy-frontend.sarif'
+
+    - name: Run Trivy vulnerability scanner on filesystem
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-fs.sarif'
+
+    # Upload security scan results
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-backend.sarif'
+
+    - name: Upload Trivy Frontend scan results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-frontend.sarif'
+
+    - name: Upload Trivy Filesystem scan results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-fs.sarif'
+
+    # Archive security reports
+    - name: Archive security scan reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-reports
+        path: |
+          safety-report.json
+          bandit-report.json
+          semgrep-report.json
+          npm-audit-report.json
+          trivy-*.sarif
+        retention-days: 30
+
+  # Secrets scanning
+  secrets-scan:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch full history for better secret detection
+
+    - name: Install TruffleHog
+      run: |
+        curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
+
+    - name: Run TruffleHog secret scanner
+      run: |
+        trufflehog git file://. --json > trufflehog-report.json || true
+        echo "TruffleHog scan completed. Check report for any secrets found."
+
+    - name: Check for common secret patterns
+      run: |
+        # Check for common secret patterns
+        echo "Checking for potential secrets..."
+
+        # Check for API keys, tokens, etc.
+        grep -r -i "api.key\|secret\|token\|password" . \
+          --exclude-dir=.git \
+          --exclude-dir=node_modules \
+          --exclude-dir=.github \
+          --exclude="*.md" \
+          --exclude="*.yml" \
+          --exclude="*.yaml" \
+          --exclude=".env.example" \
+          --exclude=".env.prod.example" \
+          > secret-patterns.txt || echo "No obvious secret patterns found"
+
+        if [ -s secret-patterns.txt ]; then
+          echo "⚠️ Potential secrets found:"
+          cat secret-patterns.txt
+          echo "Please review these findings."
+        else
+          echo "✅ No obvious secret patterns detected"
+        fi
+
+    - name: Archive secrets scan reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: secrets-scan-reports
+        path: |
+          trufflehog-report.json
+          secret-patterns.txt
+        retention-days: 30
+
+  # License compliance check
+  license-check:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install license checker
+      run: pip install pip-licenses
+
+    - name: Check Python license compliance
+      working-directory: ./backend
+      run: |
+        pip install -r requirements.txt
+        pip-licenses --format=json --output-file=python-licenses.json
+        pip-licenses --format=table
+
+    - name: Set up Node.js 18
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install license checker for Node.js
+      run: npm install -g license-checker
+
+    - name: Check Node.js license compliance
+      working-directory: ./frontend
+      run: |
+        npm ci
+        license-checker --json --out nodejs-licenses.json
+        license-checker --summary
+
+    - name: Archive license reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: license-reports
+        path: |
+          backend/python-licenses.json
+          frontend/nodejs-licenses.json
+        retention-days: 30
+
+  # Security policy compliance
+  security-policy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Check for security policy files
+      run: |
+        echo "Checking for security policy compliance..."
+
+        # Check for security-related files
+        files_to_check=(
+          "SECURITY.md"
+          ".github/SECURITY.md"
+          "docs/security.md"
+          "CONTRIBUTING.md"
+          "docs/production-deployment.md"
+        )
+
+        missing_files=""
+        for file in "${files_to_check[@]}"; do
+          if [ ! -f "$file" ]; then
+            missing_files="$missing_files\n- $file"
+          else
+            echo "✅ Found: $file"
+          fi
+        done
+
+        if [ -n "$missing_files" ]; then
+          echo "⚠️ Missing security policy files:$missing_files"
+          echo "Consider adding these files for better security posture."
+        else
+          echo "✅ All security policy files present"
+        fi
+
+    - name: Check environment variable security
+      run: |
+        echo "Checking environment variable security..."
+
+        # Check for .env files (should not be committed)
+        if find . -name ".env" -not -path "./.git/*" | grep -q .; then
+          echo "❌ Found .env files that should not be committed:"
+          find . -name ".env" -not -path "./.git/*"
+          exit 1
+        else
+          echo "✅ No .env files found in repository"
+        fi
+
+        # Check for .env.example files (should be present)
+        if [ -f ".env.example" ] || [ -f ".env.prod.example" ]; then
+          echo "✅ Environment example files present"
+        else
+          echo "⚠️ No .env.example files found - consider adding them"
+        fi
