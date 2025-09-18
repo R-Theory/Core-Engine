@@ -22,6 +22,8 @@ import {
 } from 'lucide-react'
 import IntegrationManager from '@/components/integrations/IntegrationManager'
 import { api } from '@/lib/api'
+import { useSettingsStore } from '@/stores/settingsStore'
+import { useAuthStore } from '@/stores/authStore'
 
 interface SettingsSection {
   id: string
@@ -173,6 +175,74 @@ export default function SettingsPage() {
 
 // Account & Profile Section
 function AccountSection() {
+  const { profile, loading, errors, loadProfile, saveProfile, updateProfile } = useSettingsStore()
+  const { user, updateUser } = useAuthStore()
+  const [accountData, setAccountData] = useState({
+    first_name: user?.first_name || '',
+    last_name: user?.last_name || '',
+    username: user?.username || '',
+    email: user?.email || ''
+  })
+
+  const [profileData, setProfileData] = useState(profile)
+
+  useEffect(() => {
+    loadProfile()
+  }, [loadProfile])
+
+  useEffect(() => {
+    setProfileData(profile)
+  }, [profile])
+
+  useEffect(() => {
+    if (user) {
+      setAccountData({
+        first_name: user.first_name || '',
+        last_name: user.last_name || '',
+        username: user.username || '',
+        email: user.email || ''
+      })
+    }
+  }, [user])
+
+  const handleAccountChange = (field: string, value: string) => {
+    setAccountData(prev => ({ ...prev, [field]: value }))
+  }
+
+  const handleProfileChange = (field: string, value: string) => {
+    const newProfile = { ...profileData, [field]: value }
+    setProfileData(newProfile)
+    updateProfile(newProfile)
+  }
+
+  const handleSave = async () => {
+    try {
+      // Save account info
+      const accountResponse = await api.put('/api/v1/settings/account', accountData)
+      if (accountResponse.data.status === 'success') {
+        updateUser(accountData)
+      }
+
+      // Save profile info
+      await saveProfile(profileData)
+
+      alert('Account information saved successfully!')
+    } catch (error: any) {
+      alert(error?.response?.data?.detail || 'Failed to save account information')
+    }
+  }
+
+  if (loading.profile) {
+    return (
+      <div className="space-y-8">
+        <div className="text-center py-12">
+          <User className="h-16 w-16 text-slate-400 mx-auto mb-4 animate-pulse" />
+          <p className="text-slate-600 dark:text-slate-400">Loading your profile...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-8">
       <div>
@@ -180,40 +250,65 @@ function AccountSection() {
         <p className="text-slate-600 dark:text-slate-400">Manage your personal information and account settings</p>
       </div>
 
+      {errors.profile && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-sm text-red-700">{errors.profile}</p>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Display Name
+              First Name
             </label>
-            <input 
-              type="text" 
-              className="input-modern w-full" 
-              placeholder="Your display name"
-              defaultValue="John Doe"
+            <input
+              type="text"
+              className="input-modern w-full"
+              placeholder="Your first name"
+              value={accountData.first_name}
+              onChange={(e) => handleAccountChange('first_name', e.target.value)}
             />
           </div>
-          
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Last Name
+            </label>
+            <input
+              type="text"
+              className="input-modern w-full"
+              placeholder="Your last name"
+              value={accountData.last_name}
+              onChange={(e) => handleAccountChange('last_name', e.target.value)}
+            />
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
               Email Address
             </label>
-            <input 
-              type="email" 
-              className="input-modern w-full" 
+            <input
+              type="email"
+              className="input-modern w-full bg-slate-50 dark:bg-slate-800"
               placeholder="your@email.com"
-              defaultValue="john@example.com"
+              value={accountData.email}
+              disabled
+              title="Email cannot be changed here"
             />
+            <p className="text-xs text-slate-500 mt-1">Contact support to change your email address</p>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
               University/Institution
             </label>
-            <input 
-              type="text" 
-              className="input-modern w-full" 
+            <input
+              type="text"
+              className="input-modern w-full"
               placeholder="Your university or institution"
+              value={profileData.university || ''}
+              onChange={(e) => handleProfileChange('university', e.target.value)}
             />
           </div>
         </div>
@@ -221,12 +316,27 @@ function AccountSection() {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Username
+            </label>
+            <input
+              type="text"
+              className="input-modern w-full"
+              placeholder="Your username"
+              value={accountData.username}
+              onChange={(e) => handleAccountChange('username', e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
               Student ID
             </label>
-            <input 
-              type="text" 
-              className="input-modern w-full" 
+            <input
+              type="text"
+              className="input-modern w-full"
               placeholder="Your student ID"
+              value={profileData.student_id || ''}
+              onChange={(e) => handleProfileChange('student_id', e.target.value)}
             />
           </div>
 
@@ -234,13 +344,18 @@ function AccountSection() {
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
               Academic Year
             </label>
-            <select className="input-modern w-full">
-              <option>Freshman</option>
-              <option>Sophomore</option>
-              <option>Junior</option>
-              <option>Senior</option>
-              <option>Graduate</option>
-              <option>PhD</option>
+            <select
+              className="input-modern w-full"
+              value={profileData.academic_year || ''}
+              onChange={(e) => handleProfileChange('academic_year', e.target.value)}
+            >
+              <option value="">Select academic year</option>
+              <option value="freshman">Freshman</option>
+              <option value="sophomore">Sophomore</option>
+              <option value="junior">Junior</option>
+              <option value="senior">Senior</option>
+              <option value="graduate">Graduate</option>
+              <option value="phd">PhD</option>
             </select>
           </div>
 
@@ -248,17 +363,25 @@ function AccountSection() {
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
               Major/Field of Study
             </label>
-            <input 
-              type="text" 
-              className="input-modern w-full" 
+            <input
+              type="text"
+              className="input-modern w-full"
               placeholder="Computer Science, Engineering, etc."
+              value={profileData.major || ''}
+              onChange={(e) => handleProfileChange('major', e.target.value)}
             />
           </div>
         </div>
       </div>
 
       <div className="border-t border-slate-200 dark:border-slate-700 pt-6">
-        <button className="btn-primary">Save Changes</button>
+        <button
+          className="btn-primary"
+          onClick={handleSave}
+          disabled={loading.saving}
+        >
+          {loading.saving ? 'Saving...' : 'Save Changes'}
+        </button>
       </div>
     </div>
   )
@@ -1110,47 +1233,673 @@ function PluginsSection() {
   )
 }
 
-// Other sections (placeholders)
+// Preferences & Appearance Section
 function PreferencesSection() {
+  const { preferences, loading, errors, loadPreferences, savePreferences, updatePreferences } = useSettingsStore()
+
+  useEffect(() => {
+    loadPreferences()
+  }, [loadPreferences])
+
+  const handlePreferenceChange = (field: string, value: string | boolean) => {
+    const newPreferences = { ...preferences, [field]: value }
+    updatePreferences(newPreferences)
+  }
+
+  const handleSave = async () => {
+    try {
+      await savePreferences(preferences)
+      alert('Preferences saved successfully!')
+    } catch (error: any) {
+      alert(error?.response?.data?.detail || 'Failed to save preferences')
+    }
+  }
+
+  if (loading.preferences) {
+    return (
+      <div className="space-y-8">
+        <div className="text-center py-12">
+          <Palette className="h-16 w-16 text-slate-400 mx-auto mb-4 animate-pulse" />
+          <p className="text-slate-600 dark:text-slate-400">Loading your preferences...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-8">
       <div>
         <h2 className="text-2xl font-semibold text-slate-900 dark:text-white mb-2">Preferences & Appearance</h2>
         <p className="text-slate-600 dark:text-slate-400">Customize the look and feel of your workspace</p>
       </div>
-      <div className="text-center py-12">
-        <Palette className="h-16 w-16 text-slate-400 mx-auto mb-4" />
-        <p className="text-slate-600 dark:text-slate-400">Appearance settings coming soon...</p>
+
+      {errors.preferences && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-sm text-red-700">{errors.preferences}</p>
+        </div>
+      )}
+
+      <div className="space-y-8">
+        {/* Appearance Settings */}
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Appearance</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Theme
+              </label>
+              <select
+                className="input-modern w-full"
+                value={preferences.theme}
+                onChange={(e) => handlePreferenceChange('theme', e.target.value)}
+              >
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+                <option value="system">System</option>
+              </select>
+              <p className="text-xs text-slate-500 mt-1">Choose your preferred color scheme</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Language
+              </label>
+              <select
+                className="input-modern w-full"
+                value={preferences.language}
+                onChange={(e) => handlePreferenceChange('language', e.target.value)}
+              >
+                <option value="en">English</option>
+                <option value="es">Español</option>
+                <option value="fr">Français</option>
+                <option value="de">Deutsch</option>
+                <option value="zh">中文</option>
+              </select>
+              <p className="text-xs text-slate-500 mt-1">Interface language</p>
+            </div>
+          </div>
+        </div>
+
+        {/* AI Assistant Settings */}
+        <div className="border-t border-slate-200 dark:border-slate-700 pt-8">
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">AI Assistant</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Default AI Model
+              </label>
+              <select
+                className="input-modern w-full"
+                value={preferences.default_ai_model || ''}
+                onChange={(e) => handlePreferenceChange('default_ai_model', e.target.value)}
+              >
+                <option value="">Auto-select</option>
+                <option value="gpt-4">GPT-4 (OpenAI)</option>
+                <option value="gpt-3.5-turbo">GPT-3.5 Turbo (OpenAI)</option>
+                <option value="claude-3">Claude 3 (Anthropic)</option>
+                <option value="claude-2">Claude 2 (Anthropic)</option>
+              </select>
+              <p className="text-xs text-slate-500 mt-1">Preferred model for AI assistance</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Response Style
+              </label>
+              <select
+                className="input-modern w-full"
+                value={preferences.ai_response_style}
+                onChange={(e) => handlePreferenceChange('ai_response_style', e.target.value)}
+              >
+                <option value="concise">Concise</option>
+                <option value="detailed">Detailed</option>
+                <option value="conversational">Conversational</option>
+                <option value="technical">Technical</option>
+              </select>
+              <p className="text-xs text-slate-500 mt-1">How detailed AI responses should be</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Regional Settings */}
+        <div className="border-t border-slate-200 dark:border-slate-700 pt-8">
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Regional</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Timezone
+              </label>
+              <select
+                className="input-modern w-full"
+                value={preferences.timezone || ''}
+                onChange={(e) => handlePreferenceChange('timezone', e.target.value)}
+              >
+                <option value="">Auto-detect</option>
+                <option value="America/New_York">Eastern Time (ET)</option>
+                <option value="America/Chicago">Central Time (CT)</option>
+                <option value="America/Denver">Mountain Time (MT)</option>
+                <option value="America/Los_Angeles">Pacific Time (PT)</option>
+                <option value="Europe/London">GMT (London)</option>
+                <option value="Europe/Paris">CET (Paris)</option>
+                <option value="Asia/Tokyo">JST (Tokyo)</option>
+                <option value="Asia/Shanghai">CST (Shanghai)</option>
+              </select>
+              <p className="text-xs text-slate-500 mt-1">Your local timezone for dates and times</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Privacy Settings */}
+        <div className="border-t border-slate-200 dark:border-slate-700 pt-8">
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Privacy</h3>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Public Profile
+                </label>
+                <p className="text-xs text-slate-500">Allow others to see your profile information</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  checked={preferences.public_profile}
+                  onChange={(e) => handlePreferenceChange('public_profile', e.target.checked)}
+                />
+                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 dark:peer-focus:ring-indigo-800 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-indigo-600"></div>
+              </label>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Analytics & Data Sharing
+                </label>
+                <p className="text-xs text-slate-500">Help improve the platform by sharing anonymous usage data</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  checked={preferences.data_sharing_analytics}
+                  onChange={(e) => handlePreferenceChange('data_sharing_analytics', e.target.checked)}
+                />
+                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 dark:peer-focus:ring-indigo-800 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-indigo-600"></div>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="border-t border-slate-200 dark:border-slate-700 pt-6">
+        <button
+          className="btn-primary"
+          onClick={handleSave}
+          disabled={loading.saving}
+        >
+          {loading.saving ? 'Saving...' : 'Save Preferences'}
+        </button>
       </div>
     </div>
   )
 }
 
 function NotificationsSection() {
+  const { preferences, loading, errors, loadPreferences, savePreferences, updatePreferences } = useSettingsStore()
+
+  useEffect(() => {
+    loadPreferences()
+  }, [loadPreferences])
+
+  const handleNotificationChange = (field: string, value: boolean) => {
+    const newPreferences = { ...preferences, [field]: value }
+    updatePreferences(newPreferences)
+  }
+
+  const handleSave = async () => {
+    try {
+      await savePreferences(preferences)
+      alert('Notification settings saved successfully!')
+    } catch (error: any) {
+      alert(error?.response?.data?.detail || 'Failed to save notification settings')
+    }
+  }
+
+  if (loading.preferences) {
+    return (
+      <div className="space-y-8">
+        <div className="text-center py-12">
+          <Bell className="h-16 w-16 text-slate-400 mx-auto mb-4 animate-pulse" />
+          <p className="text-slate-600 dark:text-slate-400">Loading notification settings...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-8">
       <div>
         <h2 className="text-2xl font-semibold text-slate-900 dark:text-white mb-2">Notifications</h2>
         <p className="text-slate-600 dark:text-slate-400">Configure how and when you receive notifications</p>
       </div>
-      <div className="text-center py-12">
-        <Bell className="h-16 w-16 text-slate-400 mx-auto mb-4" />
-        <p className="text-slate-600 dark:text-slate-400">Notification settings coming soon...</p>
+
+      {errors.preferences && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-sm text-red-700">{errors.preferences}</p>
+        </div>
+      )}
+
+      <div className="space-y-8">
+        {/* Email Notifications */}
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Email Notifications</h3>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Email Notifications
+                </label>
+                <p className="text-xs text-slate-500">Receive notifications via email</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  checked={preferences.email_notifications}
+                  onChange={(e) => handleNotificationChange('email_notifications', e.target.checked)}
+                />
+                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 dark:peer-focus:ring-indigo-800 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-indigo-600"></div>
+              </label>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Assignment Reminders
+                </label>
+                <p className="text-xs text-slate-500">Get reminded about upcoming assignments and due dates</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  checked={preferences.assignment_reminders}
+                  onChange={(e) => handleNotificationChange('assignment_reminders', e.target.checked)}
+                />
+                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 dark:peer-focus:ring-indigo-800 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-indigo-600"></div>
+              </label>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Workflow Notifications
+                </label>
+                <p className="text-xs text-slate-500">Get notified when workflows complete or fail</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  checked={preferences.workflow_notifications}
+                  onChange={(e) => handleNotificationChange('workflow_notifications', e.target.checked)}
+                />
+                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 dark:peer-focus:ring-indigo-800 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-indigo-600"></div>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        {/* Push Notifications */}
+        <div className="border-t border-slate-200 dark:border-slate-700 pt-8">
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Push Notifications</h3>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Browser Notifications
+                </label>
+                <p className="text-xs text-slate-500">Receive push notifications in your browser</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  checked={preferences.push_notifications}
+                  onChange={(e) => handleNotificationChange('push_notifications', e.target.checked)}
+                />
+                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 dark:peer-focus:ring-indigo-800 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-indigo-600"></div>
+              </label>
+            </div>
+
+            {preferences.push_notifications && (
+              <div className="ml-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <p className="text-sm text-blue-700 dark:text-blue-300 mb-2">
+                  Push notifications require browser permission
+                </p>
+                <button
+                  className="btn-secondary text-sm"
+                  onClick={() => {
+                    if ('Notification' in window) {
+                      Notification.requestPermission().then(permission => {
+                        if (permission === 'granted') {
+                          alert('Notifications enabled!')
+                        } else {
+                          alert('Please enable notifications in your browser settings')
+                        }
+                      })
+                    }
+                  }}
+                >
+                  Request Permission
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Notification Schedule */}
+        <div className="border-t border-slate-200 dark:border-slate-700 pt-8">
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Schedule</h3>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Assignment Reminder Timing
+              </label>
+              <select className="input-modern w-full max-w-xs">
+                <option value="1">1 day before due date</option>
+                <option value="2">2 days before due date</option>
+                <option value="3">3 days before due date</option>
+                <option value="7">1 week before due date</option>
+              </select>
+              <p className="text-xs text-slate-500 mt-1">When to send assignment reminders</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Daily Summary
+              </label>
+              <select className="input-modern w-full max-w-xs">
+                <option value="none">Disabled</option>
+                <option value="morning">Morning (8:00 AM)</option>
+                <option value="evening">Evening (6:00 PM)</option>
+              </select>
+              <p className="text-xs text-slate-500 mt-1">Receive a daily summary of tasks and updates</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="border-t border-slate-200 dark:border-slate-700 pt-6">
+        <button
+          className="btn-primary"
+          onClick={handleSave}
+          disabled={loading.saving}
+        >
+          {loading.saving ? 'Saving...' : 'Save Notification Settings'}
+        </button>
       </div>
     </div>
   )
 }
 
 function DataSection() {
+  const [isExporting, setIsExporting] = useState(false)
+  const [isClearing, setIsClearing] = useState(false)
+
+  const handleExportData = async () => {
+    setIsExporting(true)
+    try {
+      const response = await api.get('/api/v1/settings/export', {
+        responseType: 'blob'
+      })
+
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `core-engine-data-${new Date().toISOString().split('T')[0]}.json`)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+
+      alert('Data exported successfully!')
+    } catch (error: any) {
+      alert(error?.response?.data?.detail || 'Failed to export data')
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  const handleImportData = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      try {
+        const data = JSON.parse(e.target?.result as string)
+
+        if (confirm('This will overwrite your current settings. Are you sure?')) {
+          const response = await api.post('/api/v1/settings/import', data)
+          if (response.data.status === 'success') {
+            alert('Data imported successfully! Please refresh the page.')
+            window.location.reload()
+          }
+        }
+      } catch (error: any) {
+        alert(error?.response?.data?.detail || 'Failed to import data')
+      }
+    }
+    reader.readAsText(file)
+
+    // Reset input
+    event.target.value = ''
+  }
+
+  const handleClearCache = async () => {
+    if (!confirm('This will clear all cached data. Are you sure?')) return
+
+    setIsClearing(true)
+    try {
+      await api.post('/api/v1/settings/clear-cache')
+
+      // Clear localStorage
+      localStorage.removeItem('settings-storage')
+      localStorage.removeItem('auth-storage')
+
+      alert('Cache cleared successfully!')
+      window.location.reload()
+    } catch (error: any) {
+      alert(error?.response?.data?.detail || 'Failed to clear cache')
+    } finally {
+      setIsClearing(false)
+    }
+  }
+
+  const handleDeleteAccount = async () => {
+    const confirmation = prompt(
+      'This action cannot be undone. Type "DELETE" to confirm account deletion:'
+    )
+
+    if (confirmation !== 'DELETE') {
+      alert('Account deletion cancelled')
+      return
+    }
+
+    try {
+      await api.delete('/api/v1/settings/account')
+      alert('Account deleted successfully')
+      window.location.href = '/auth/login'
+    } catch (error: any) {
+      alert(error?.response?.data?.detail || 'Failed to delete account')
+    }
+  }
+
   return (
     <div className="space-y-8">
       <div>
         <h2 className="text-2xl font-semibold text-slate-900 dark:text-white mb-2">Data & Privacy</h2>
         <p className="text-slate-600 dark:text-slate-400">Export, import, and manage your data</p>
       </div>
-      <div className="text-center py-12">
-        <Database className="h-16 w-16 text-slate-400 mx-auto mb-4" />
-        <p className="text-slate-600 dark:text-slate-400">Data management coming soon...</p>
+
+      <div className="space-y-8">
+        {/* Data Export */}
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Data Export</h3>
+          <div className="space-y-4">
+            <div className="glass-card p-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h4 className="font-semibold text-slate-900 dark:text-white mb-2">
+                    Export All Data
+                  </h4>
+                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+                    Download a complete backup of your profile, settings, integrations, and AI context data in JSON format.
+                  </p>
+                  <ul className="text-xs text-slate-500 space-y-1">
+                    <li>• User profile and account information</li>
+                    <li>• Application preferences and settings</li>
+                    <li>• Integration configurations (credentials excluded)</li>
+                    <li>• AI context and conversation history</li>
+                    <li>• Course and assignment data</li>
+                  </ul>
+                </div>
+                <button
+                  className="btn-primary"
+                  onClick={handleExportData}
+                  disabled={isExporting}
+                >
+                  {isExporting ? 'Exporting...' : 'Export Data'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Data Import */}
+        <div className="border-t border-slate-200 dark:border-slate-700 pt-8">
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Data Import</h3>
+          <div className="space-y-4">
+            <div className="glass-card p-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h4 className="font-semibold text-slate-900 dark:text-white mb-2">
+                    Import Settings
+                  </h4>
+                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+                    Restore your data from a previously exported backup file. This will overwrite your current settings.
+                  </p>
+                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
+                    <p className="text-xs text-yellow-700 dark:text-yellow-300">
+                      <strong>Warning:</strong> This will replace all your current settings. Make sure to export your current data first if you want to keep it.
+                    </p>
+                  </div>
+                </div>
+                <div>
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={handleImportData}
+                    className="hidden"
+                    id="import-file"
+                  />
+                  <label
+                    htmlFor="import-file"
+                    className="btn-secondary cursor-pointer"
+                  >
+                    Import Data
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Cache Management */}
+        <div className="border-t border-slate-200 dark:border-slate-700 pt-8">
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Cache Management</h3>
+          <div className="space-y-4">
+            <div className="glass-card p-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h4 className="font-semibold text-slate-900 dark:text-white mb-2">
+                    Clear Cache
+                  </h4>
+                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+                    Clear all cached data including temporary files, session data, and browser storage. This may help resolve performance issues.
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    You will need to sign in again after clearing the cache.
+                  </p>
+                </div>
+                <button
+                  className="btn-secondary"
+                  onClick={handleClearCache}
+                  disabled={isClearing}
+                >
+                  {isClearing ? 'Clearing...' : 'Clear Cache'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Privacy Settings */}
+        <div className="border-t border-slate-200 dark:border-slate-700 pt-8">
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Privacy</h3>
+          <div className="space-y-4">
+            <div className="glass-card p-6">
+              <h4 className="font-semibold text-slate-900 dark:text-white mb-4">Data Processing</h4>
+              <div className="space-y-3 text-sm text-slate-600 dark:text-slate-400">
+                <p>
+                  <strong>Personal Data:</strong> Your profile information, settings, and AI context are stored securely and are only accessible to you.
+                </p>
+                <p>
+                  <strong>Integration Data:</strong> Credentials for external services are encrypted using industry-standard encryption and stored separately from your profile.
+                </p>
+                <p>
+                  <strong>AI Interactions:</strong> Conversations with AI assistants are stored locally to provide context but are not shared with third parties.
+                </p>
+                <p>
+                  <strong>Analytics:</strong> If enabled, anonymous usage data helps improve the platform but never includes personal information.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Danger Zone */}
+        <div className="border-t border-red-200 dark:border-red-800 pt-8">
+          <h3 className="text-lg font-semibold text-red-600 dark:text-red-400 mb-4">Danger Zone</h3>
+          <div className="space-y-4">
+            <div className="border border-red-200 dark:border-red-800 rounded-lg p-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h4 className="font-semibold text-red-900 dark:text-red-100 mb-2">
+                    Delete Account
+                  </h4>
+                  <p className="text-sm text-red-700 dark:text-red-300 mb-4">
+                    Permanently delete your account and all associated data. This action cannot be undone.
+                  </p>
+                  <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+                    <p className="text-xs text-red-700 dark:text-red-300">
+                      <strong>Warning:</strong> This will permanently delete your account, profile, settings, AI context, and all data. There is no way to recover this information.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
+                  onClick={handleDeleteAccount}
+                >
+                  Delete Account
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )

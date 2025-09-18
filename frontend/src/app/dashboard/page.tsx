@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { coursesApi, assignmentsApi, workflowsApi } from '@/lib/api'
 import { useAuthStore } from '@/stores/authStore'
+import { useCanvas, useCanvasCourses, useCanvasAssignments, useCanvasConnection } from '@/providers/CanvasProvider'
 import { Layout } from '@/components/layout/Layout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -25,20 +26,32 @@ export default function DashboardPage() {
   const { user } = useAuthStore()
   const router = useRouter()
 
-  const { data: courses = [] } = useQuery({
+  // Canvas integration
+  const { isCanvasConnected, hasCanvasData, activeCanvas } = useCanvas()
+  const { courses: canvasCourses, loading: coursesLoading } = useCanvasCourses()
+  const { assignments: canvasAssignments, loading: assignmentsLoading } = useCanvasAssignments()
+
+  // Fallback to local API if Canvas not connected
+  const { data: localCourses = [] } = useQuery({
     queryKey: ['courses'],
     queryFn: () => coursesApi.getCourses().then(res => res.data),
+    enabled: !isCanvasConnected
   })
 
-  const { data: assignments = [] } = useQuery({
+  const { data: localAssignments = [] } = useQuery({
     queryKey: ['assignments'],
     queryFn: () => assignmentsApi.getAssignments().then(res => res.data),
+    enabled: !isCanvasConnected
   })
 
   const { data: workflows = [] } = useQuery({
     queryKey: ['workflows'],
     queryFn: () => workflowsApi.getWorkflows().then(res => res.data),
   })
+
+  // Use Canvas data when available, otherwise use local data
+  const courses = isCanvasConnected ? canvasCourses : localCourses
+  const assignments = isCanvasConnected ? canvasAssignments : localAssignments
 
   const upcomingAssignments = assignments
     .filter((a: any) => a.due_date && new Date(a.due_date) > new Date())
@@ -81,40 +94,75 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* Canvas Connection Status */}
+        {isCanvasConnected && (
+          <div className="mb-6 p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-3 h-3 bg-emerald-500 rounded-full"></div>
+                <div>
+                  <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">
+                    Connected to {activeCanvas?.name || 'Canvas'}
+                  </p>
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                    Academic data is synced from Canvas LMS
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => router.push('/settings')}
+                className="text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
+              >
+                Manage
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <Card className="perplexity-card border-0">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
+              <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center gap-2">
                 Active Courses
+                {isCanvasConnected && (
+                  <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs rounded-full">
+                    Canvas
+                  </span>
+                )}
               </CardTitle>
               <BookOpen className="h-5 w-5 text-blue-600" />
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
-                {courses.length}
+                {coursesLoading ? '...' : courses.length}
               </div>
               <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center">
                 <TrendingUp className="h-3 w-3 mr-1 text-green-500" />
-                +2 this semester
+                {isCanvasConnected ? 'From Canvas' : '+2 this semester'}
               </p>
             </CardContent>
           </Card>
 
           <Card className="perplexity-card border-0">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
+              <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center gap-2">
                 Due This Week
+                {isCanvasConnected && (
+                  <span className="px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 text-xs rounded-full">
+                    Canvas
+                  </span>
+                )}
               </CardTitle>
               <Clock className="h-5 w-5 text-orange-600" />
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
-                {upcomingAssignments.length}
+                {assignmentsLoading ? '...' : upcomingAssignments.length}
               </div>
               <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center">
                 <Target className="h-3 w-3 mr-1 text-orange-500" />
-                3 high priority
+                {isCanvasConnected ? 'From Canvas' : '3 high priority'}
               </p>
             </CardContent>
           </Card>

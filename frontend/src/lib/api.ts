@@ -87,6 +87,53 @@ export const authApi = {
   logout: () => api.post('/api/v1/auth/logout'),
 }
 
+// Settings API
+export const settingsApi = {
+  // Profile endpoints
+  getProfile: () => api.get('/api/v1/settings/profile'),
+  updateProfile: (data: any) => api.put('/api/v1/settings/profile', data),
+
+  // Preferences endpoints
+  getPreferences: () => api.get('/api/v1/settings/preferences'),
+  updatePreferences: (data: any) => api.put('/api/v1/settings/preferences', data),
+
+  // Account endpoints
+  getAccount: () => api.get('/api/v1/settings/account'),
+  updateAccount: (data: any) => api.put('/api/v1/settings/account', data),
+  deleteAccount: () => api.delete('/api/v1/settings/account'),
+
+  // Integrations endpoints
+  getIntegrations: () => api.get('/api/v1/settings/integrations'),
+  getAvailableIntegrations: () => api.get('/api/v1/settings/integrations/available'),
+  getSyncStatus: () => api.get('/api/v1/settings/integrations/sync-status'),
+  testIntegration: (serviceName: string, config: any) =>
+    api.post(`/api/v1/settings/integrations/${serviceName}/test`, config),
+  setupIntegration: (serviceName: string, config: any) =>
+    api.post('/api/v1/settings/integrations/setup', { service_name: serviceName, config }),
+  toggleIntegration: (integrationId: string) =>
+    api.put(`/api/v1/settings/integrations/${integrationId}/toggle`),
+  syncIntegration: (integrationId: string, fullSync?: boolean) =>
+    api.post(`/api/v1/settings/integrations/${integrationId}/sync`, { full_sync: fullSync }),
+  syncAllIntegrations: () => api.post('/api/v1/settings/integrations/sync'),
+
+  // Data management endpoints
+  exportData: () => api.get('/api/v1/settings/export', { responseType: 'blob' }),
+  importData: (data: any) => api.post('/api/v1/settings/import', data),
+  clearCache: () => api.post('/api/v1/settings/clear-cache'),
+
+  // Context documents
+  getContextDocuments: () => api.get('/api/v1/settings/context-documents'),
+  uploadContextDocument: (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api.post('/api/v1/settings/context-documents/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+  },
+  deleteContextDocument: (documentId: string) =>
+    api.delete(`/api/v1/settings/context-documents/${documentId}`)
+}
+
 // Courses API
 export const coursesApi = {
   getCourses: () => api.get('/api/v1/courses'),
