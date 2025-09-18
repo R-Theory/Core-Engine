@@ -1,5 +1,5 @@
 # Multi-stage build for production optimization
-FROM node:18-alpine as deps
+FROM node:24-alpine as deps
 
 # Install system dependencies
 RUN apk add --no-cache libc6-compat
@@ -13,7 +13,7 @@ COPY package*.json ./
 RUN npm ci --omit=dev --frozen-lockfile
 
 # Builder stage
-FROM node:18-alpine as builder
+FROM node:24-alpine as builder
 
 WORKDIR /app
 
@@ -27,7 +27,7 @@ COPY . .
 RUN npm run build
 
 # Production stage
-FROM node:18-alpine as production
+FROM node:24-alpine as production
 
 # Install system dependencies
 RUN apk add --no-cache \
