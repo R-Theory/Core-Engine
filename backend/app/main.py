@@ -8,6 +8,9 @@ from app.core.database import init_db
 from app.core.plugin_loader import PluginLoader
 from app.core.agent_registry import AgentRegistry
 from app.core.celery_app import celery_app
+from app.core.monitoring import PrometheusMiddleware, metrics_handler, health_handler, setup_monitoring
+from app.core.cache import cache_manager
+from app.core.rate_limiter import rate_limiter, RateLimitMiddleware
 from app.api.v1 import auth, courses, assignments, resources, plugins, workflows, agents, documents, ai_context, credentials as credentials_api
 from app.api.v1 import settings as settings_api
 # Import integrations to register them
@@ -69,10 +72,17 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Failed to initialize document system: {str(e)}")
     
+    # Initialize performance systems
+    await cache_manager.connect()
+    await rate_limiter.connect()
+    setup_monitoring()
+
     logger.info("Core Engine MVP started successfully")
     yield
     # Shutdown
     logger.info("Shutting down Core Engine MVP...")
+    await cache_manager.disconnect()
+    logger.info("Performance systems shut down")
 
 app = FastAPI(
     title="Core Engine MVP",
@@ -80,6 +90,10 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+
+# Add performance middleware
+app.add_middleware(RateLimitMiddleware)
+app.add_middleware(PrometheusMiddleware)
 
 # CORS middleware
 app.add_middleware(
@@ -115,18 +129,16 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Comprehensive health check endpoint"""
-    health_status = {
-        "status": "healthy",
-        "version": "1.0.0",
-        "timestamp": "2024-12-10T00:00:00Z",
-        "services": {
-            "database": "healthy",
-            "redis": "healthy",
-            "plugins": len(plugin_loader.list_plugins()),
-            "agents": len(agent_registry.list_agents())
-        }
-    }
-    return health_status
+    from fastapi import Request
+    request = Request({"type": "http", "method": "GET", "path": "/health"})
+    return await health_handler(request)
+
+@app.get("/metrics")
+async def metrics():
+    """Prometheus metrics endpoint"""
+    from fastapi import Request
+    request = Request({"type": "http", "method": "GET", "path": "/metrics"})
+    return await metrics_handler(request)
 
 @app.post("/github-app/list-installations")
 async def list_github_app_installations(credentials: dict):

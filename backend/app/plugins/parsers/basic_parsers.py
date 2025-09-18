@@ -18,7 +18,7 @@ from app.core.plugin_interface import (
 
 # Optional imports for different file types
 try:
-    import PyPDF2
+    import pypdf
     PDF_AVAILABLE = True
 except ImportError:
     PDF_AVAILABLE = False
@@ -226,7 +226,7 @@ class TextParserPlugin(ParserPlugin):
 
 class PDFParserPlugin(ParserPlugin):
     """
-    Parser for PDF files using PyPDF2
+    Parser for PDF files using pypdf
     """
     
     def __init__(self, config: PluginConfig):
@@ -241,14 +241,14 @@ class PDFParserPlugin(ParserPlugin):
             author="Core Engine Team",
             plugin_type=PluginType.PARSER,
             capabilities=[PluginCapability.PARSE, PluginCapability.READ],
-            dependencies=["PyPDF2"],
+            dependencies=["pypdf"],
             config_schema={}
         )
 
     async def initialize(self) -> bool:
         """Initialize the PDF parser"""
         if not PDF_AVAILABLE:
-            self.logger.error("PyPDF2 not available")
+            self.logger.error("pypdf not available")
             return False
         
         self.logger.info("PDF parser initialized")
@@ -276,14 +276,14 @@ class PDFParserPlugin(ParserPlugin):
             if not PDF_AVAILABLE:
                 return PluginResult(
                     success=False,
-                    error_message="PyPDF2 not available"
+                    error_message="pypdf not available"
                 )
             
             content_parts = []
             metadata = {}
             
             with open(file_path, 'rb') as file:
-                pdf_reader = PyPDF2.PdfReader(file)
+                pdf_reader = pypdf.PdfReader(file)
                 
                 # Extract metadata
                 doc_info = pdf_reader.metadata

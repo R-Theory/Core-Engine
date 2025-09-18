@@ -54,11 +54,11 @@ CREDENTIAL_PROVIDERS = {
         "auth_mode": "app"
     },
     "canvas": {
-        "name": "Canvas LMS", 
+        "name": "Canvas LMS",
         "description": "Learning management system integration",
         "plugin_name": "canvas-provider",
-        "fields": ["api_key", "base_url"],
-        "test_endpoint": False
+        "fields": ["access_token", "api_url", "instance_name"],
+        "test_endpoint": True
     }
 }
 

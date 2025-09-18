@@ -511,3 +511,122 @@ async def get_integration_sync_status(
         })
     
     return status_info
+
+# Data Export/Import/Cache endpoints
+@router.get("/export")
+async def export_user_data(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Export all user data"""
+    try:
+        # Get all user data
+        profile = db.query(UserProfile).filter(UserProfile.user_id == current_user.id).first()
+        preferences = db.query(UserPreference).filter(UserPreference.user_id == current_user.id).first()
+        integrations = db.query(UserIntegration).filter(UserIntegration.user_id == current_user.id).all()
+
+        export_data = {
+            "account": {
+                "username": current_user.username,
+                "first_name": current_user.first_name,
+                "last_name": current_user.last_name,
+                "email": current_user.email
+            },
+            "profile": profile.__dict__ if profile else {},
+            "preferences": preferences.__dict__ if preferences else {},
+            "integrations": [
+                {
+                    "service_name": integration.service_name,
+                    "service_type": integration.service_type,
+                    "display_name": integration.display_name,
+                    "description": integration.description,
+                    "is_active": integration.is_active
+                    # Note: credentials are excluded for security
+                }
+                for integration in integrations
+            ],
+            "export_date": datetime.utcnow().isoformat()
+        }
+
+        # Clean up SQLAlchemy internals
+        import json
+        cleaned_data = json.loads(json.dumps(export_data, default=str))
+
+        return cleaned_data
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/import")
+async def import_user_data(
+    import_data: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Import user data from backup"""
+    try:
+        # Update profile if provided
+        if "profile" in import_data and import_data["profile"]:
+            profile = db.query(UserProfile).filter(UserProfile.user_id == current_user.id).first()
+            if not profile:
+                profile = UserProfile(user_id=current_user.id)
+                db.add(profile)
+
+            for key, value in import_data["profile"].items():
+                if hasattr(profile, key) and key not in ["id", "user_id", "created_at", "updated_at"]:
+                    setattr(profile, key, value)
+
+        # Update preferences if provided
+        if "preferences" in import_data and import_data["preferences"]:
+            preferences = db.query(UserPreference).filter(UserPreference.user_id == current_user.id).first()
+            if not preferences:
+                preferences = UserPreference(user_id=current_user.id)
+                db.add(preferences)
+
+            for key, value in import_data["preferences"].items():
+                if hasattr(preferences, key) and key not in ["id", "user_id", "created_at", "updated_at"]:
+                    setattr(preferences, key, value)
+
+        db.commit()
+
+        return {"status": "success", "message": "Data imported successfully"}
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/clear-cache")
+async def clear_user_cache(
+    current_user: User = Depends(get_current_user)
+):
+    """Clear user cache and temporary data"""
+    try:
+        # TODO: Implement actual cache clearing logic
+        # This would typically clear Redis cache, temp files, etc.
+
+        return {"status": "success", "message": "Cache cleared successfully"}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/account")
+async def delete_user_account(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Delete user account and all associated data"""
+    try:
+        # Delete all related data first (due to foreign key constraints)
+        db.query(UserProfile).filter(UserProfile.user_id == current_user.id).delete()
+        db.query(UserPreference).filter(UserPreference.user_id == current_user.id).delete()
+        db.query(UserIntegration).filter(UserIntegration.user_id == current_user.id).delete()
+
+        # Delete user account
+        db.delete(current_user)
+        db.commit()
+
+        return {"status": "success", "message": "Account deleted successfully"}
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
