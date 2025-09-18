@@ -24,7 +24,7 @@
     "autoprefixer": "^10.4.16",
     "postcss": "^8.4.31",
     "tailwindcss-animate": "^1.0.7",
-    "zustand": "^4.4.7",
+    "zustand": "^5.0.8",
     "@tanstack/react-query": "^5.8.4",
     "axios": "^1.6.2",
     "react-hook-form": "^7.48.2",
