@@ -1,0 +1,133 @@
+groups:
+  - name: core_engine_alerts
+    rules:
+      # High CPU usage alert
+      - alert: HighCPUUsage
+        expr: system_cpu_usage_percent > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is above 80% for more than 5 minutes. Current value: {{ $value }}%"
+
+      # Critical CPU usage alert
+      - alert: CriticalCPUUsage
+        expr: system_cpu_usage_percent > 95
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical CPU usage detected"
+          description: "CPU usage is above 95% for more than 2 minutes. Current value: {{ $value }}%"
+
+      # High memory usage alert
+      - alert: HighMemoryUsage
+        expr: (system_memory_usage_bytes / 1024 / 1024 / 1024) > 7
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is above 7GB for more than 5 minutes. Current value: {{ $value }}GB"
+
+      # High disk usage alert
+      - alert: HighDiskUsage
+        expr: (system_disk_usage_bytes / 1024 / 1024 / 1024) > 80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High disk usage detected"
+          description: "Disk usage is above 80GB for more than 10 minutes. Current value: {{ $value }}GB"
+
+      # High error rate alert
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status_code=~"5.."}[5m]) > 0.1
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High HTTP error rate detected"
+          description: "HTTP 5xx error rate is above 0.1 requests/second for more than 3 minutes. Current value: {{ $value }}"
+
+      # High response time alert
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High response time detected"
+          description: "95th percentile response time is above 2 seconds for more than 5 minutes. Current value: {{ $value }}s"
+
+      # Service down alert
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service is down"
+          description: "{{ $labels.job }} service has been down for more than 1 minute."
+
+      # Too many active connections
+      - alert: TooManyActiveConnections
+        expr: active_connections > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Too many active connections"
+          description: "Number of active connections is above 100 for more than 5 minutes. Current value: {{ $value }}"
+
+      # Database connection issues
+      - alert: DatabaseConnectionIssues
+        expr: database_connections_active == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No active database connections"
+          description: "No active database connections detected for more than 2 minutes."
+
+      # Celery task failures
+      - alert: CeleryTaskFailures
+        expr: rate(celery_tasks_total{status="error"}[5m]) > 0.1
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High Celery task failure rate"
+          description: "Celery task failure rate is above 0.1 failures/second for more than 3 minutes. Current value: {{ $value }}"
+
+  - name: infrastructure_alerts
+    rules:
+      # Container restart alert
+      - alert: ContainerRestarted
+        expr: increase(container_start_time_seconds[1h]) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container restarted"
+          description: "Container {{ $labels.name }} has restarted in the last hour."
+
+      # High container memory usage
+      - alert: ContainerHighMemoryUsage
+        expr: (container_memory_usage_bytes / container_spec_memory_limit_bytes) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container high memory usage"
+          description: "Container {{ $labels.name }} memory usage is above 80% for more than 5 minutes."
+
+      # High container CPU usage
+      - alert: ContainerHighCPUUsage
+        expr: rate(container_cpu_usage_seconds_total[5m]) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container high CPU usage"
+          description: "Container {{ $labels.name }} CPU usage is above 80% for more than 5 minutes."
