@@ -1,29 +1,37 @@
 services:
-  # PostgreSQL Database
+  # PostgreSQL Database with optimized configuration
   postgres:
     image: postgres:15-alpine
     environment:
-      POSTGRES_DB: core_engine
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-core_engine}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./postgres/postgresql.conf:/etc/postgresql/postgresql.conf
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     ports:
       - "5432:5432"
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
 
-  # Redis Cache
+  # Redis Cache with optimized configuration
   redis:
     image: redis:7-alpine
-    command: redis-server --appendonly yes
+    command: redis-server /etc/redis/redis.conf
     volumes:
       - redis_data:/data
+      - ./redis/redis.conf:/etc/redis/redis.conf
     ports:
       - "6379:6379"
     healthcheck:
@@ -32,18 +40,27 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
 
-  # Backend API
+  # Backend API with performance optimizations
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/core_engine
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-core_engine}
       - REDIS_URL=redis://redis:6379/0
-      - SECRET_KEY=your-secret-key-change-in-production
-      - ENVIRONMENT=development
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - SECRET_KEY=${SECRET_KEY}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
       - UPLOAD_DIR=/app/storage
+      - ALLOWED_HOSTS=["*"]
     volumes:
       - ./backend:/app
       - backend_storage:/app/storage
@@ -56,6 +73,17 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # Frontend
   frontend:
@@ -76,17 +104,19 @@ services:
       - backend
     restart: unless-stopped
 
-  # Celery Worker for Background Tasks
+  # Celery Worker for Background Tasks (Optimized)
   celery-worker:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    command: celery -A app.main:celery_app worker --loglevel=info --concurrency=2
+    command: celery -A app.core.celery_app worker --loglevel=info --concurrency=4 --queues=default,ai_queue,plugin_queue,user_queue --hostname=worker-dev@%h
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/core_engine
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-core_engine}
       - REDIS_URL=redis://redis:6379/1
-      - SECRET_KEY=your-secret-key-change-in-production
-      - ENVIRONMENT=development
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - SECRET_KEY=${SECRET_KEY}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
     volumes:
       - ./backend:/app
       - backend_storage:/app/storage
@@ -96,26 +126,39 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
 
-  # Celery Beat Scheduler
+  # Celery Beat Scheduler (Optimized)
   celery-beat:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    command: celery -A app.main:celery_app beat --loglevel=info
+    command: celery -A app.core.celery_app beat --loglevel=info
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/core_engine
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-core_engine}
       - REDIS_URL=redis://redis:6379/1
-      - SECRET_KEY=your-secret-key-change-in-production
-      - ENVIRONMENT=development
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - SECRET_KEY=${SECRET_KEY}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
     volumes:
       - ./backend:/app
+      - celery_beat_data:/app/celerybeat-schedule
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
 
 volumes:
   postgres_data:
@@ -123,6 +166,7 @@ volumes:
   backend_storage:
   frontend_node_modules:
   frontend_next:
+  celery_beat_data:
 
 networks:
   default:

@@ -1,33 +1,62 @@
-version: '3.8'
-
 services:
   postgres:
     # Override dev ports for production (no host exposure)
     ports: []
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
 
   redis:
     # Override dev ports for production (no host exposure)
     ports: []
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
 
   backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
     # Run in production mode without bind mounts
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/core_engine
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-core_engine}
       - REDIS_URL=redis://redis:6379/0
-      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - SECRET_KEY=${SECRET_KEY}
       - ENVIRONMENT=production
       - UPLOAD_DIR=/app/storage
+      - DEBUG=false
+      - LOG_LEVEL=INFO
     volumes:
       - backend_storage:/app/storage
-    restart: unless-stopped
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
 
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.prod
     # Production mode and API URL override
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
       - NODE_ENV=production
     # Serve built assets from the image (no app volume)
     volumes: []
@@ -37,26 +66,60 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
-    restart: unless-stopped
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
 
   celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    command: celery -A app.main:celery_app worker --loglevel=warning --concurrency=4 --max-tasks-per-child=1000
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/core_engine
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-core_engine}
       - REDIS_URL=redis://redis:6379/1
-      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - SECRET_KEY=${SECRET_KEY}
       - ENVIRONMENT=production
+      - LOG_LEVEL=WARNING
     volumes:
       - backend_storage:/app/storage
-    restart: unless-stopped
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
 
   celery-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    command: celery -A app.main:celery_app beat --loglevel=warning
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/core_engine
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-core_engine}
       - REDIS_URL=redis://redis:6379/1
-      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - SECRET_KEY=${SECRET_KEY}
       - ENVIRONMENT=production
+      - LOG_LEVEL=WARNING
     # No code volume in production
-    restart: unless-stopped
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
 
 volumes:
   backend_storage:
