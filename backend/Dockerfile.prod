@@ -1,5 +1,5 @@
 # Multi-stage build for production optimization
-FROM python:3.11-slim as builder
+FROM python:3.13-slim as builder
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -20,7 +20,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir --user -r requirements.txt
 
 # Production stage
-FROM python:3.11-slim as production
+FROM python:3.13-slim as production
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
