@@ -7,22 +7,27 @@ from .plugin import Plugin, UserPluginConfig
 from .workflow import Workflow, WorkflowExecution
 from .agent import AIAgent, AgentInteraction
 from .user_profile import UserProfile, UserProfileDocument, UserIntegration, UserCredential, UserPreference
+from .ai_context import UserAIContext, UserContextDocument, AIConversation, AIContextTemplate
 
 __all__ = [
     "User",
-    "Course", 
+    "Course",
     "Topic",
     "Assignment",
     "Resource",
     "Plugin",
-    "UserPluginConfig", 
+    "UserPluginConfig",
     "Workflow",
     "WorkflowExecution",
     "AIAgent",
     "AgentInteraction",
     "UserProfile",
     "UserProfileDocument",
-    "UserIntegration", 
+    "UserIntegration",
     "UserCredential",
-    "UserPreference"
+    "UserPreference",
+    "UserAIContext",
+    "UserContextDocument",
+    "AIConversation",
+    "AIContextTemplate"
 ]

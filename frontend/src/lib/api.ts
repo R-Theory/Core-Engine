@@ -17,14 +17,44 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-// Response interceptor for error handling
+// Response interceptor for error handling and token refresh
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401) {
-      // Token expired, clear auth state
-      useAuthStore.getState().clearAuth()
-      window.location.href = '/auth/login'
+    const originalRequest = error.config
+
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true
+
+      const { refreshToken, clearAuth, setAuth } = useAuthStore.getState()
+
+      if (refreshToken) {
+        try {
+          // Attempt to refresh the token
+          const response = await axios.post(`${API_BASE_URL}/api/v1/auth/refresh`, {
+            refresh_token: refreshToken
+          })
+
+          const { user, access_token, refresh_token } = response.data
+          setAuth(user, access_token, refresh_token)
+
+          // Retry the original request with new token
+          originalRequest.headers.Authorization = `Bearer ${access_token}`
+          return api(originalRequest)
+        } catch (refreshError) {
+          // Refresh failed, clear auth and redirect
+          clearAuth()
+          if (typeof window !== 'undefined') {
+            window.location.href = '/auth/login'
+          }
+        }
+      } else {
+        // No refresh token, clear auth and redirect
+        clearAuth()
+        if (typeof window !== 'undefined') {
+          window.location.href = '/auth/login'
+        }
+      }
     }
     return Promise.reject(error)
   }
@@ -51,6 +81,10 @@ export const authApi = {
   }) => api.post('/api/v1/auth/register', data),
   
   getMe: () => api.get('/api/v1/auth/me'),
+
+  refresh: (refreshToken: string) => api.post('/api/v1/auth/refresh', { refresh_token: refreshToken }),
+
+  logout: () => api.post('/api/v1/auth/logout'),
 }
 
 // Courses API
